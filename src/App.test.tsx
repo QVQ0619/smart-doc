@@ -23,6 +23,6 @@ test("点击菜单切换中间页", async () => {
   render(<App />);
   await userEvent.click(screen.getByText("审查报告"));
   expect(
-    screen.getByRole("heading", { name: "审查报告" }),
+    await screen.findByRole("heading", { name: "审查报告" }),
   ).toBeInTheDocument();
 });
