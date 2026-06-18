@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useChatCollapseStore } from "../store/useChatCollapseStore";
 import "../styles/global.css";
 
 interface AppShellProps {
@@ -8,8 +9,12 @@ interface AppShellProps {
 }
 
 export default function AppShell({ menu, main, chat }: AppShellProps) {
+  const collapsed = useChatCollapseStore((s) => s.collapsed);
+  const rootClass = collapsed
+    ? "app-shell app-shell--chat-collapsed"
+    : "app-shell";
   return (
-    <div className="app-shell">
+    <div className={rootClass}>
       <aside className="app-shell__menu" data-testid="shell-menu">
         {menu}
       </aside>

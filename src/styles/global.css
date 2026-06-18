@@ -47,3 +47,24 @@ body {
   border-left: 1px solid #e5e6eb;
   background: #ffffff;
 }
+
+/* 右栏折叠态：列宽收窄为竖条 */
+.app-shell--chat-collapsed {
+  grid-template-columns: 220px 1fr 48px;
+}
+
+.chat-rail {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.chat-rail__label {
+  writing-mode: vertical-rl;
+  letter-spacing: 2px;
+  color: #86909c;
+  font-size: 13px;
+}
