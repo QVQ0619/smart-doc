@@ -5,9 +5,8 @@ from pathlib import Path
 
 
 @dataclass
-class StoredFile:
-    stored_name: str
-    rel_path: str
+class StoredBlob:
+    object_key: str
     size_bytes: int
     sha256: str
 
@@ -18,17 +17,16 @@ class FileTooLargeError(Exception):
         super().__init__(f"file exceeds {limit_bytes} bytes")
 
 
-class Storage:
+class FileStorage:
     CHUNK = 1024 * 1024
 
     def __init__(self, base_dir):
         self.base_dir = Path(base_dir)
 
-    def save(self, category: str, original_name: str, stream, max_bytes: int) -> StoredFile:
+    def save(self, prefix: str, original_name: str, stream, max_bytes: int) -> StoredBlob:
         ext = Path(original_name).suffix
-        stored_name = f"{uuid.uuid4().hex}{ext}"
-        rel_path = f"{category}/{stored_name}"
-        dest = self.base_dir / category / stored_name
+        object_key = f"{prefix}/{uuid.uuid4().hex}{ext}"
+        dest = self.base_dir / object_key
         dest.parent.mkdir(parents=True, exist_ok=True)
 
         hasher = hashlib.sha256()
@@ -48,13 +46,13 @@ class Storage:
             dest.unlink(missing_ok=True)
             raise
 
-        return StoredFile(stored_name, rel_path, size, hasher.hexdigest())
+        return StoredBlob(object_key, size, hasher.hexdigest())
 
-    def delete(self, rel_path: str) -> None:
-        (self.base_dir / rel_path).unlink(missing_ok=True)
+    def delete(self, object_key: str) -> None:
+        (self.base_dir / object_key).unlink(missing_ok=True)
 
 
-def get_storage() -> Storage:
+def get_storage() -> "FileStorage":
     from .config import settings
 
-    return Storage(settings.storage_dir)
+    return FileStorage(settings.storage_dir)
