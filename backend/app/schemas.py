@@ -1,18 +1,17 @@
 from datetime import datetime
+from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 
-class DocumentOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class StandardDocOut(BaseModel):
     id: int
-    category: str
-    original_name: str
-    size_bytes: int
-    mime_type: str
-    sha256: str
-    created_at: datetime
+    doc_code: str
+    title: str
+    file_name: str
+    size_bytes: Optional[int]
+    mime_type: Optional[str]
+    created_at: Optional[datetime]
 
 
 class FailedItem(BaseModel):
@@ -21,5 +20,5 @@ class FailedItem(BaseModel):
 
 
 class UploadResult(BaseModel):
-    uploaded: list[DocumentOut]
+    uploaded: list[StandardDocOut]
     failed: list[FailedItem]
