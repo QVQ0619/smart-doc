@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .db import Base, engine
+from . import models  # noqa: F401  # 触发 Document 表注册，供 create_all 建表
 
 
 def create_app() -> FastAPI:
