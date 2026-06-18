@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SideMenu from "./SideMenu";
 import { useRouteStore } from "../store/useRouteStore";
@@ -7,9 +7,9 @@ beforeEach(() => {
   useRouteStore.setState({ route: "home" });
 });
 
-test("渲染品牌名与全部菜单项", () => {
+test("渲染品牌名与全部菜单项", async () => {
   render(<SideMenu />);
-  expect(screen.getByText("立项审查AI辅助系统")).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByText("立项审查AI辅助系统")).toBeInTheDocument());
   for (const label of [
     "工作台",
     "新建审查",
@@ -27,5 +27,5 @@ test("渲染品牌名与全部菜单项", () => {
 test("点击菜单项更新路由 store", async () => {
   render(<SideMenu />);
   await userEvent.click(screen.getByText("新建审查"));
-  expect(useRouteStore.getState().route).toBe("review-new");
+  await waitFor(() => expect(useRouteStore.getState().route).toBe("review-new"));
 });
