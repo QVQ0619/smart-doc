@@ -12,10 +12,10 @@ beforeEach(() => {
   useRouteStore.setState({ route: "home" });
 });
 
-test("默认渲染工作台页", () => {
+test("默认渲染工作台页", async () => {
   render(<App />);
   expect(
-    screen.getByRole("heading", { name: "工作台" }),
+    await screen.findByRole("heading", { name: "工作台" }),
   ).toBeInTheDocument();
 });
 
