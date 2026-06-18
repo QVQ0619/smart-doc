@@ -56,8 +56,7 @@ def upload_standard_docs(
                 sensitivity="内部",
             )
             db.add(fo)
-            db.commit()
-            db.refresh(fo)
+            db.flush()          # assigns fo.id WITHOUT committing
 
             title = name.rsplit(".", 1)[0] if "." in name else name
             sd = StandardDoc(
@@ -68,8 +67,9 @@ def upload_standard_docs(
                 is_active=True,
             )
             db.add(sd)
-            db.commit()
+            db.commit()         # single commit for both
             db.refresh(sd)
+            db.refresh(fo)      # ensure fo fields (e.g. created_at) are loaded for _to_out
         except Exception as e:  # noqa: BLE001
             db.rollback()
             storage.delete(blob.object_key)

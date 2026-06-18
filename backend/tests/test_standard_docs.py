@@ -30,7 +30,9 @@ def test_upload_multiple_rule_files(client):
         ],
     )
     assert r.status_code == 200
-    assert len(r.json()["uploaded"]) == 2
+    body = r.json()
+    assert body["failed"] == []
+    assert len(body["uploaded"]) == 2
 
 
 def test_upload_oversize_goes_to_failed(client):
@@ -49,3 +51,30 @@ def test_upload_oversize_goes_to_failed(client):
     body = r.json()
     assert [d["file_name"] for d in body["uploaded"]] == ["ok.txt"]
     assert [f["name"] for f in body["failed"]] == ["big.txt"]
+
+
+def test_standarddoc_failure_rolls_back_fileobject(client, storage_dir, monkeypatch):
+    from app.routers import standard_docs
+    from sqlalchemy import text
+    from sqlmodel import Session
+    from app.db import engine
+
+    def boom(*a, **k):
+        raise RuntimeError("forced standard_doc failure")
+    monkeypatch.setattr(standard_docs, "StandardDoc", boom)
+
+    r = client.post(
+        "/api/standard-docs",
+        files=[("files", ("x.txt", b"data", "text/plain"))],
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["uploaded"] == []
+    assert len(body["failed"]) == 1
+    # FileObject NOT orphaned (single-transaction rollback)
+    with Session(engine) as s:
+        n = s.execute(text("SELECT COUNT(*) FROM file_object")).scalar_one()
+    assert n == 0
+    # disk file removed
+    sd_dir = storage_dir / "standard_doc"
+    assert (not sd_dir.exists()) or list(sd_dir.iterdir()) == []
