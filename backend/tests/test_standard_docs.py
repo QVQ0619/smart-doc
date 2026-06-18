@@ -78,3 +78,46 @@ def test_standarddoc_failure_rolls_back_fileobject(client, storage_dir, monkeypa
     # disk file removed
     sd_dir = storage_dir / "standard_doc"
     assert (not sd_dir.exists()) or list(sd_dir.iterdir()) == []
+
+
+def _upload_one(client, name, content):
+    return client.post(
+        "/api/standard-docs",
+        files=[("files", (name, content, "text/plain"))],
+    ).json()["uploaded"][0]
+
+
+def test_list_returns_active(client):
+    _upload_one(client, "r1.txt", b"r1")
+    _upload_one(client, "r2.txt", b"r2")
+    rows = client.get("/api/standard-docs").json()
+    assert {d["file_name"] for d in rows} == {"r1.txt", "r2.txt"}
+
+
+def test_download_returns_original_bytes(client):
+    doc = _upload_one(client, "p.txt", b"hello-bytes")
+    r = client.get(f"/api/standard-docs/{doc['id']}/download")
+    assert r.status_code == 200
+    assert r.content == b"hello-bytes"
+
+
+def test_download_unknown_404(client):
+    assert client.get("/api/standard-docs/999999/download").status_code == 404
+
+
+def test_delete_soft_removes_from_list_but_keeps_file(client, storage_dir):
+    doc = _upload_one(client, "d.txt", b"data")
+    assert any((storage_dir / "standard_doc").iterdir())
+
+    r = client.delete(f"/api/standard-docs/{doc['id']}")
+    assert r.status_code == 204
+    # 列表已不含
+    assert client.get("/api/standard-docs").json() == []
+    # 磁盘文件保留（软删）
+    assert list((storage_dir / "standard_doc").iterdir())
+    # 再次下载 404（已软删）
+    assert client.get(f"/api/standard-docs/{doc['id']}/download").status_code == 404
+
+
+def test_delete_unknown_404(client):
+    assert client.delete("/api/standard-docs/999999").status_code == 404

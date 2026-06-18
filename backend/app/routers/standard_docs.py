@@ -1,6 +1,9 @@
 import uuid
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+from sqlalchemy import select
 from sqlmodel import Session
 
 from ..config import get_max_upload_bytes
@@ -79,3 +82,47 @@ def upload_standard_docs(
         uploaded.append(_to_out(sd, fo))
 
     return UploadResult(uploaded=uploaded, failed=failed)
+
+
+@router.get("/standard-docs", response_model=list[StandardDocOut])
+def list_standard_docs(db: Session = Depends(get_session)) -> list[StandardDocOut]:
+    rows = db.execute(
+        select(StandardDoc, FileObject)
+        .join(FileObject, StandardDoc.file_id == FileObject.id)
+        .where(StandardDoc.is_active == True, FileObject.deleted_at == None)  # noqa: E712
+        .order_by(StandardDoc.created_at.desc(), StandardDoc.id.desc())
+    ).all()
+    return [_to_out(sd, fo) for sd, fo in rows]
+
+
+@router.get("/standard-docs/{doc_id}/download")
+def download_standard_doc(
+    doc_id: int,
+    db: Session = Depends(get_session),
+    storage: FileStorage = Depends(get_storage),
+):
+    sd = db.get(StandardDoc, doc_id)
+    if sd is None or not sd.is_active:
+        raise HTTPException(status_code=404, detail="standard_doc not found")
+    fo = db.get(FileObject, sd.file_id) if sd.file_id else None
+    if fo is None:
+        raise HTTPException(status_code=404, detail="file_object missing")
+    path = storage.base_dir / fo.object_key
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="file missing on disk")
+    return FileResponse(path, filename=fo.file_name, media_type=fo.mime_type or "application/octet-stream")
+
+
+@router.delete("/standard-docs/{doc_id}", status_code=204)
+def delete_standard_doc(doc_id: int, db: Session = Depends(get_session)):
+    sd = db.get(StandardDoc, doc_id)
+    if sd is None or not sd.is_active:
+        raise HTTPException(status_code=404, detail="standard_doc not found")
+    sd.is_active = False
+    if sd.file_id:
+        fo = db.get(FileObject, sd.file_id)
+        if fo is not None:
+            fo.deleted_at = datetime.now(timezone.utc)
+            db.add(fo)
+    db.add(sd)
+    db.commit()
