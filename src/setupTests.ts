@@ -1,20 +1,19 @@
 import "@testing-library/jest-dom/vitest";
 
-// antd Table (rc-table) 依赖 getComputedStyle 计算滚动条宽度；jsdom 的实现会通过 virtualConsole
-// 触发 "Not implemented" jsdomError（即 stderr 输出）。用 Proxy 完全替换以避免 stderr 污染，
-// 同时通过 Proxy 使 dom-accessibility-api 所需的 getPropertyValue 等方法正常工作。
-window.getComputedStyle = (_elt: Element, _pseudo?: string | null): CSSStyleDeclaration => {
-  return new Proxy({} as CSSStyleDeclaration, {
-    get(_target, prop: string | symbol) {
-      if (prop === "getPropertyValue") return () => "";
-      if (prop === "setProperty") return () => undefined;
-      if (prop === "removeProperty") return () => "";
-      if (prop === "item") return () => "";
-      if (prop === "length") return 0;
-      if (prop === Symbol.iterator) return function* () {};
-      return "";
-    },
-  });
+// antd Table (rc-table) 在 jsdom 环境中调用 getComputedStyle(elt, pseudoElt) 会触发
+// jsdom virtualConsole "jsdomError" 事件（vitest 将其路由到 console.error），产生 stderr 噪音。
+// jsdom 内部使用 notImplemented() 函数——它只 emit 事件，不 throw——因此 try/catch 无法捕获。
+// 窄化修复：仅过滤掉这条特定的 "Not implemented: window.getComputedStyle" console.error，
+// 保留 window.getComputedStyle 本身不变，真实计算样式值对所有普通调用完整保留。
+const _origConsoleError = console.error.bind(console);
+console.error = (...args: unknown[]) => {
+  if (
+    typeof args[0] === "string" &&
+    args[0].includes("Not implemented: window.getComputedStyle")
+  ) {
+    return; // 仅静默此条 jsdom 伪元素 getComputedStyle 噪音
+  }
+  _origConsoleError(...args);
 };
 
 // antd 组件依赖 matchMedia / ResizeObserver，jsdom 未实现，需补丁
