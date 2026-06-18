@@ -6,3 +6,12 @@ dist
 vite.config.js
 vite.config.d.ts
 .env
+
+# backend
+backend/.venv/
+backend/storage/
+backend/_unused_test_storage/
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/.env
