@@ -1,6 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+// 稳定 spy：模块级别定义，供各测试复用并断言
+const setActiveSession = vi.fn();
+
 // mock agent-kit 子模块，避免真实网络/socket
 vi.mock("@blade-hq/agent-kit/chat", () => ({
   ChatView: ({ sessionId }: { sessionId: string }) => (
@@ -11,7 +14,7 @@ vi.mock("@blade-hq/agent-kit/react", () => ({
   BladeClientProvider: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
-  useSessionStore: { getState: () => ({ setActiveSession: vi.fn() }) },
+  useSessionStore: { getState: () => ({ setActiveSession }) },
 }));
 
 const createSession = vi.fn().mockResolvedValue({ session_id: "s-123" });
@@ -30,6 +33,7 @@ import ChatPanel from "./ChatPanel";
 
 beforeEach(() => {
   createSession.mockClear();
+  setActiveSession.mockClear();
 });
 
 test("未配置 token 时显示提示，不建会话", () => {
@@ -46,6 +50,7 @@ test("已配置 token 时自动建会话并渲染 ChatView", async () => {
     expect(screen.getByTestId("chatview")).toHaveTextContent("session:s-123"),
   );
   expect(createSession).toHaveBeenCalledTimes(1);
+  expect(setActiveSession).toHaveBeenCalledWith("s-123");
 });
 
 test("点击新建会话按钮再次建会话", async () => {

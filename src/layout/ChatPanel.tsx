@@ -27,14 +27,10 @@ export default function ChatPanel() {
       const bizRoleId = getBizRoleId();
       let result: { session_id: string };
       if (solutionId !== undefined || bizRoleId !== undefined) {
-        // Use createSessionWithRequest to carry solution_id / biz_role_id
-        result = await (bladeClient.sessions as unknown as {
-          createSessionWithRequest: (req: {
-            intent?: string;
-            solution_id?: string;
-            biz_role_id?: string;
-          }) => Promise<{ session_id: string }>;
-        }).createSessionWithRequest({
+        // Use createSessionWithRequest to carry solution_id / biz_role_id.
+        // bladeClient.sessions is typed as SessionsResource which declares
+        // createSessionWithRequest(request: CreateSessionRequest) — no cast needed.
+        result = await bladeClient.sessions.createSessionWithRequest({
           intent: "立项审查对话",
           ...(solutionId !== undefined ? { solution_id: solutionId } : {}),
           ...(bizRoleId !== undefined ? { biz_role_id: bizRoleId } : {}),
