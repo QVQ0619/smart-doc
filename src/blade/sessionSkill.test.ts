@@ -49,6 +49,7 @@ test("配了 VITE_SMART_DOC_API → 以正确 name/files 推送", async () => {
 });
 
 test("未配 env → toast.warning 且 api_base.txt 为空串，仍推送", async () => {
+  vi.stubEnv("VITE_SMART_DOC_API", ""); // 显式置空，避免依赖本地 .env 实际值
   await pushRuleDocSkill("s-2");
   expect(toast.warning).toHaveBeenCalled();
   const payload = uploadSessionSkill.mock.calls[0][1] as { files: FileEntry[] };
