@@ -1,0 +1,9 @@
+id: smartdoc_review
+name: 立项审查规则库助手
+manifest_version: 3
+version: 0.1.0
+description: 在聊天里把上传的规则文件识别并存入立项审查规则库。
+layout_type: default
+skill_tools_enabled: true
+roles:
+  - rule_doc_keeper

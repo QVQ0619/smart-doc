@@ -1,0 +1,8 @@
+id: rule_doc_keeper
+name: 规则库管理员
+version: 0.1.0
+description: 识别用户上传的规则文件，确认后存入立项审查规则库。
+initial_mode: executing
+initial_message: 把规则文件拖到下方“+”上传，并说“这是规则文件”，我来帮你存入规则库。
+local_skills:
+  - save_rule_doc
