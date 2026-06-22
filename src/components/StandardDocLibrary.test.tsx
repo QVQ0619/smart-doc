@@ -11,6 +11,7 @@ vi.mock("../api/standardDocs", async () => {
     listStandardDocs: vi.fn(),
     uploadStandardDocs: vi.fn(),
     deleteStandardDoc: vi.fn(),
+    recognizeStandardDoc: vi.fn(),
   };
 });
 
@@ -26,12 +27,16 @@ function renderLib() {
 const sample = {
   id: 1, doc_code: "SD-abc", title: "政策A",
   file_name: "政策A.pdf", size_bytes: 2048, mime_type: "application/pdf", created_at: "2026-06-18T00:00:00Z",
+  recognition_status: "done",
 };
 
 beforeEach(() => {
   vi.mocked(api.listStandardDocs).mockResolvedValue([sample] as never);
   vi.mocked(api.uploadStandardDocs).mockResolvedValue({ uploaded: [sample], failed: [] } as never);
   vi.mocked(api.deleteStandardDoc).mockResolvedValue();
+  vi.mocked(api.recognizeStandardDoc).mockResolvedValue({
+    doc_id: 1, doc_code: "SD-abc", recognition_status: "done", segment_count: 9, page_count: 2, error: null,
+  } as never);
 });
 
 test("渲染列表中的规则文件标题", async () => {
@@ -54,6 +59,18 @@ test("删除经确认调用 deleteStandardDoc", async () => {
   await userEvent.click(screen.getByRole("button", { name: "删除" }));
   await userEvent.click(await screen.findByRole("button", { name: /确.?定/ }));
   await waitFor(() => expect(vi.mocked(api.deleteStandardDoc)).toHaveBeenCalledWith(1));
+});
+
+test("显示识别状态徽标", async () => {
+  renderLib();
+  expect(await screen.findByText("已识别")).toBeInTheDocument();
+});
+
+test("点重新识别调用 recognizeStandardDoc", async () => {
+  renderLib();
+  await screen.findByText("政策A");
+  await userEvent.click(screen.getByRole("button", { name: "重新识别" }));
+  await waitFor(() => expect(vi.mocked(api.recognizeStandardDoc)).toHaveBeenCalledWith(1));
 });
 
 test("规则库页挂载时每 10 秒轮询刷新列表", async () => {

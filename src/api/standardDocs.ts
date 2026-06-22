@@ -6,6 +6,18 @@ export interface StandardDoc {
   size_bytes: number | null;
   mime_type: string | null;
   created_at: string | null;
+  recognition_status: string;
+  segment_count?: number | null;
+  page_count?: number | null;
+}
+
+export interface RecognizeResult {
+  doc_id: number;
+  doc_code: string;
+  recognition_status: string;
+  segment_count: number;
+  page_count: number | null;
+  error: string | null;
 }
 
 export interface UploadFailed {
@@ -45,4 +57,10 @@ export function deleteStandardDoc(id: number): Promise<void> {
 
 export function downloadStandardDocUrl(id: number): string {
   return `/api/standard-docs/${id}/download`;
+}
+
+export function recognizeStandardDoc(id: number): Promise<RecognizeResult> {
+  return fetch(`/api/standard-docs/${id}/recognize`, { method: "POST" }).then((r) =>
+    handle<RecognizeResult>(r),
+  );
 }

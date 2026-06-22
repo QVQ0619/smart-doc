@@ -4,6 +4,7 @@ import {
   uploadStandardDocs,
   deleteStandardDoc,
   downloadStandardDocUrl,
+  recognizeStandardDoc,
 } from "./standardDocs";
 
 const fetchMock = vi.fn();
@@ -44,4 +45,14 @@ test("downloadStandardDocUrl 返回地址", () => {
 test("非 2xx 抛错", async () => {
   fetchMock.mockResolvedValue({ ok: false, status: 500, statusText: "err", text: async () => "boom" });
   await expect(listStandardDocs()).rejects.toThrow(/500/);
+});
+
+test("recognizeStandardDoc 发 POST 到识别接口", async () => {
+  fetchMock.mockResolvedValue({
+    ok: true, status: 200,
+    json: async () => ({ doc_id: 3, doc_code: "SD-x", recognition_status: "done", segment_count: 7, page_count: 2, error: null }),
+  });
+  const res = await recognizeStandardDoc(3);
+  expect(fetchMock).toHaveBeenCalledWith("/api/standard-docs/3/recognize", { method: "POST" });
+  expect(res.segment_count).toBe(7);
 });

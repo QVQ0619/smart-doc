@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Button, Popconfirm, Space, Table } from "antd";
+import { Button, Popconfirm, Space, Table, Tag } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import {
   uploadStandardDocs,
   deleteStandardDoc,
   downloadStandardDocUrl,
+  recognizeStandardDoc,
   type StandardDoc,
 } from "../api/standardDocs";
 
@@ -52,6 +53,22 @@ export default function StandardDocLibrary() {
     onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
   });
 
+  const STATUS: Record<string, { color: string; text: string }> = {
+    pending: { color: "default", text: "待识别" },
+    done: { color: "green", text: "已识别" },
+    failed: { color: "red", text: "识别失败" },
+  };
+
+  const recognizeMut = useMutation({
+    mutationFn: (id: number) => recognizeStandardDoc(id),
+    onSuccess: (res) => {
+      if (res.recognition_status === "done") toast.success(`已识别 ${res.segment_count} 段`);
+      else toast.warning("识别失败：" + (res.error ?? "未知原因"));
+      qc.invalidateQueries({ queryKey: KEY });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+  });
+
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (files.length) uploadMut.mutate(files);
@@ -62,6 +79,15 @@ export default function StandardDocLibrary() {
     { title: "标题", dataIndex: "title", key: "title" },
     { title: "文件名", dataIndex: "file_name", key: "file_name" },
     { title: "大小", dataIndex: "size_bytes", key: "size_bytes", render: (b: number | null) => humanSize(b) },
+    {
+      title: "识别状态",
+      dataIndex: "recognition_status",
+      key: "recognition_status",
+      render: (s: string) => {
+        const m = STATUS[s] ?? { color: "default", text: s };
+        return <Tag color={m.color}>{m.text}</Tag>;
+      },
+    },
     {
       title: "上传时间",
       dataIndex: "created_at",
@@ -76,6 +102,13 @@ export default function StandardDocLibrary() {
           <a href={downloadStandardDocUrl(row.id)} target="_blank" rel="noreferrer">
             下载
           </a>
+          <Button
+            type="link"
+            loading={recognizeMut.isPending && recognizeMut.variables === row.id}
+            onClick={() => recognizeMut.mutate(row.id)}
+          >
+            重新识别
+          </Button>
           <Popconfirm
             title="确认删除该规则文件？"
             okText="确定"
