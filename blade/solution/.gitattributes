@@ -1,4 +1,0 @@
-# 本包内文件随 skill 下发到 Linux agent 运行环境，强制 LF，避免 CRLF 破坏
-# api_base.txt 读取（尾随 \r 会污染 URL）与脚本执行。
-smartdoc_review/** text eol=lf
-*.ps1 text eol=crlf

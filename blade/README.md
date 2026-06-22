@@ -1,26 +1,20 @@
-# Blade 集成产物（聊天上传规则文件入库）
+# Blade 集成产物（规则文件入库 · 会话推送）
 
-本目录是「聊天里上传规则文件 → Blade agent 识别 → 入规则库」功能在本仓库内的产物，
-配合部署到你的 Blade solution / agent 容器使用。设计见
-`docs/superpowers/specs/2026-06-22-聊天上传规则文件入库-design.md`。
+「聊天里上传规则文件 → Blade agent 识别 → 入立项审查规则库」的最终落地：**会话推送**。
+设计见 `docs/superpowers/specs/2026-06-22-本地skill按会话推送入库-design.md`。
 
-## 组成
-- `skills/save_rule_doc/SKILL.md` — 教 agent 何时、怎么调 `smart-doc-add`、怎么如实回报。
-- shim 源码在 `../backend/agent_shim/smart_doc_add.py`（纯标准库）。
+## 工作方式（无需手动部署 skill）
+前端（`src/blade/sessionSkill.ts`）在创建会话成功后，自动用 SDK 的
+`partnerSkillApi.uploadSessionSkill` 把本技能推送到该会话的 agent 沙箱：
+- `blade/skills/save-rule-doc/SKILL.md` —— 教 agent 何时/怎么跑脚本、如实回报。
+- `backend/agent_shim/smart_doc_add.py` —— 纯标准库 shim（**单一真源**，前端 `?raw` 引入其文本）。
+- `scripts/api_base.txt` —— 后端地址，由前端 env `VITE_SMART_DOC_API` 注入。
 
-## 部署步骤
-1. **挂 shim**：把 `backend/agent_shim/smart_doc_add.py` 放进 agent 容器，暴露为 PATH 上的可执行 `smart-doc-add`。任选：
-   - 文件首行已是 `#!/usr/bin/env python3`，`chmod +x` 后软链到 `/usr/local/bin/smart-doc-add`；
-   - 或包一层：`/usr/local/bin/smart-doc-add` 内容为
-     ```sh
-     #!/usr/bin/env sh
-     exec python3 /opt/smart-doc/smart_doc_add.py "$@"
-     ```
-2. **配环境变量**（agent 容器内）：
-   - `SMART_DOC_API`：smart-doc 后端可达地址，例 `http://smart-doc-backend:8000`（同机/同网地址，**不要用 localhost**，除非 agent 与后端真正共享网络命名空间）。
-   - `SMART_DOC_TIMEOUT`：可选，单次上传超时秒数，默认 120。
-3. **装 skill**：把 `skills/save_rule_doc/` 按你的 solution 的 skill 格式装入。若用 `versions/<ver>/SKILL.md` 结构（如 blade-coa），相应放置；frontmatter 字段按你的平台规范调整。
-4. **确认附件上传开启**：聊天用的 `<ChatView>` 原生支持附件，确保 solution 未禁用。
+agent 自动发现该会话级技能；用户用 ChatView「+」上传文件 + 说「这是规则文件」即触发入库。
 
-## 验证
+## 你只需做两件事
+1. **起隧道**给本地后端一个公网域名（agent 在远端，够不到 localhost）。
+2. 前端 `.env` 配 `VITE_SMART_DOC_API=<隧道域名>`，重启 `npm run dev`。换域名只改这里，不动 skill。
+
+## 端到端验证
 见 spec 的「端到端人工验证」。
