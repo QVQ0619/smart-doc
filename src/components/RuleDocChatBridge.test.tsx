@@ -2,41 +2,25 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import RuleDocChatBridge from "./RuleDocChatBridge";
 
-// Mock 模块（hoisting 安全的写法）
+const { send, uploadFiles } = vi.hoisted(() => ({ send: vi.fn(), uploadFiles: vi.fn() }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }));
+
 vi.mock("@blade-hq/agent-kit/react", () => ({
-  uploadFiles: vi.fn(),
-  useChat: vi.fn(),
-  buildMessageContent: vi.fn(),
+  uploadFiles: (...a: unknown[]) => uploadFiles(...a),
+  useChat: () => ({ send }),
+  buildMessageContent: (text: string) => ({ text }),
 }));
 
+const uploadStandardDocs = vi.hoisted(() => vi.fn());
 vi.mock("../api/standardDocs", () => ({
-  uploadStandardDocs: vi.fn(),
+  uploadStandardDocs: (...a: unknown[]) => uploadStandardDocs(...a),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
-    success: vi.fn(),
-    warning: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
-// 导入 mock 模块
-import * as agentKit from "@blade-hq/agent-kit/react";
-import * as standardDocsModule from "../api/standardDocs";
-import * as sonnerModule from "sonner";
-
-// 获取引用便于测试中使用
-const uploadFiles = vi.mocked(agentKit.uploadFiles);
-const send = vi.fn();
-const uploadStandardDocs = vi.mocked(standardDocsModule.uploadStandardDocs);
-const toast = vi.mocked(sonnerModule.toast);
+vi.mock("sonner", () => ({ toast }));
 
 beforeEach(() => {
   send.mockReset();
   uploadFiles.mockReset().mockResolvedValue({ uploaded: ["uploads/政策A.pdf"], failed: [] });
-  vi.mocked(agentKit.useChat).mockReset().mockImplementation(() => ({ send }));
-  vi.mocked(agentKit.buildMessageContent).mockReset().mockImplementation((text: string) => ({ text }));
   uploadStandardDocs.mockReset().mockResolvedValue({
     uploaded: [
       { id: 1, doc_code: "SD-abc", title: "政策A", file_name: "政策A.pdf", size_bytes: 10, mime_type: "application/pdf", created_at: null },

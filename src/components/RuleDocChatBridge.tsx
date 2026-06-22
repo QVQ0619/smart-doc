@@ -25,6 +25,7 @@ export default function RuleDocChatBridge({ sessionId }: { sessionId: string }) 
       send(
         buildMessageContent(
           `我上传了 ${file.name}，请判断它是不是规则文档（政策/指南/规范），并建议是否存入规则库。`,
+          [],
         ),
       );
     } catch {
@@ -43,7 +44,7 @@ export default function RuleDocChatBridge({ sessionId }: { sessionId: string }) 
         const d = res.uploaded[0];
         toast.success(`已存入规则库：${d.title}（${d.doc_code}）`);
         try {
-          send(buildMessageContent(`已存入规则库：${d.title}（${d.doc_code}）`));
+          send(buildMessageContent(`已存入规则库：${d.title}（${d.doc_code}）`, []));
         } catch {
           /* 反映到对话失败不影响入库结果 */
         }
