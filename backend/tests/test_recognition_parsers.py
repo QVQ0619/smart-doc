@@ -44,6 +44,9 @@ def test_parse_pdf_two_pages_with_table():
     assert p1 and p1[0].locator == {"page": 1, "block_index": 0}
     tables = [s for s in segs if s.segment_type == "table"]
     assert tables and "CELL_1" in tables[0].content_text
+    p2_paras = [s for s in segs if s.page_no == 2 and s.segment_type == "paragraph"]
+    assert all("CELL_1" not in s.content_text for s in p2_paras)
+    assert all("COL_A" not in s.content_text for s in p2_paras)
 
 
 def test_segmentdraft_is_dataclass():

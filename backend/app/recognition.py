@@ -37,12 +37,16 @@ def parse_pdf(path: Path) -> list[SegmentDraft]:
     drafts: list[SegmentDraft] = []
     with pdfplumber.open(str(path)) as pdf:
         for pageno, page in enumerate(pdf.pages, start=1):
-            text = page.extract_text() or ""
+            tables = page.find_tables()
+            text_region = page
+            for t in tables:
+                text_region = text_region.outside_bbox(t.bbox)
+            text = text_region.extract_text() or ""
             blocks = [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
             for bi, block in enumerate(blocks):
                 drafts.append(SegmentDraft(pageno, {"page": pageno, "block_index": bi}, "paragraph", _clip(block)))
-            for ti, table in enumerate(page.extract_tables() or []):
-                ttext = _rows_to_text(table)
+            for ti, t in enumerate(tables):
+                ttext = _rows_to_text(t.extract())
                 if ttext:
                     drafts.append(SegmentDraft(pageno, {"page": pageno, "table_index": ti}, "table", _clip(ttext)))
     return drafts
