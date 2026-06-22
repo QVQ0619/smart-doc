@@ -6,6 +6,12 @@ from pathlib import Path
 
 import pdfplumber
 from docx import Document
+from sqlalchemy import delete
+from sqlmodel import Session
+
+from .models import FileObject, ParseSegment, StandardDoc
+from .schemas import RecognizeResult
+from .storage import FileStorage
 
 MAX_SEGMENT_CHARS = 65536
 
@@ -77,3 +83,65 @@ def parse_docx(path: Path) -> list[SegmentDraft]:
         if ttext:
             drafts.append(SegmentDraft(None, {"table_index": j}, "table", _clip(ttext)))
     return drafts
+
+
+def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> RecognizeResult:
+    sd = db.get(StandardDoc, doc_id)
+    fo = db.get(FileObject, sd.file_id) if sd and sd.file_id else None
+    ext = (Path(fo.file_name).suffix.lower() if fo else "")
+    status, error, drafts = "failed", None, []
+    try:
+        if fo is None:
+            error = "源文件记录缺失，无法识别"
+        else:
+            path = storage.base_dir / fo.object_key
+            if not path.exists():
+                error = "源文件缺失，无法识别"
+            elif ext == ".pdf":
+                drafts = parse_pdf(path)
+                if not drafts:
+                    error = "未从 PDF 抽取到文本，可能是扫描件（暂不支持 OCR）"
+            elif ext == ".docx":
+                drafts = parse_docx(path)
+                if not drafts:
+                    error = "文档为空，未抽取到任何内容"
+            else:
+                raise UnsupportedFormatError(ext or "(无扩展名)")
+    except UnsupportedFormatError as e:
+        error = f"不支持的格式 {e.ext}，请转存为 .docx 或 PDF"
+        drafts = []
+    except Exception as e:  # noqa: BLE001
+        error = f"识别失败：{str(e)[:300]}"
+        drafts = []
+
+    # DB 约束：segment_type IN ('text','table','title','figure')
+    _TYPE_MAP = {"heading": "title", "paragraph": "text"}
+
+    if drafts and error is None:
+        db.execute(delete(ParseSegment).where(ParseSegment.standard_doc_id == doc_id))
+        for d in drafts:
+            db.add(ParseSegment(
+                standard_doc_id=doc_id,
+                material_file_id=None,
+                page_no=d.page_no,
+                locator=d.locator,
+                segment_type=_TYPE_MAP.get(d.segment_type, d.segment_type),
+                content_text=d.content_text,
+            ))
+        status = "done"
+        segment_count = len(drafts)
+        pages = {d.page_no for d in drafts if d.page_no is not None}
+        page_count = max(pages) if pages else None
+    else:
+        status, segment_count, page_count = "failed", 0, None
+        if error is None:
+            error = "识别失败：未产出任何片段"
+
+    sd.recognition_status = status
+    sd.recognition_error = error if status == "failed" else None
+    db.add(sd)
+    db.commit()
+    return RecognizeResult(
+        doc_id=doc_id, doc_code=sd.doc_code, recognition_status=status,
+        segment_count=segment_count, page_count=page_count, error=error if status == "failed" else None,
+    )
