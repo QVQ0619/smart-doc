@@ -8,7 +8,7 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.
 vi.mock("@blade-hq/agent-kit/react", () => ({
   uploadFiles: (...a: unknown[]) => uploadFiles(...a),
   useChat: () => ({ send }),
-  buildMessageContent: (text: string) => ({ text }),
+  buildMessageContent: (text: string, _attachments: unknown[]) => ({ text }),
 }));
 
 const uploadStandardDocs = vi.hoisted(() => vi.fn());
