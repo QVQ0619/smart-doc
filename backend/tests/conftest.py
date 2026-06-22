@@ -61,13 +61,12 @@ def storage_dir(tmp_path):
 def client(_test_db, storage_dir):
     from app.storage import FileStorage, get_storage
 
-    # 清理本期涉及的表（先删子表 parse_segment，再删父表）
+    # 清理本期涉及的表（regulation_clause 是 standard_doc 与 parse_segment 的子表，先删）
     with Session(engine) as s:
-        s.execute(text("SET FOREIGN_KEY_CHECKS=0"))
+        s.execute(text("DELETE FROM regulation_clause"))
         s.execute(text("DELETE FROM parse_segment"))
         s.execute(text("DELETE FROM standard_doc"))
         s.execute(text("DELETE FROM file_object"))
-        s.execute(text("SET FOREIGN_KEY_CHECKS=1"))
         s.commit()
 
     fastapi_app.dependency_overrides[get_storage] = lambda: FileStorage(storage_dir)
