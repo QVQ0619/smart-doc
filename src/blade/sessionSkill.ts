@@ -16,7 +16,11 @@ export function getSmartDocApi(): string | undefined {
   return v && v.length > 0 ? v : undefined;
 }
 
-async function pushOne(sessionId: string, name: string, files: FileEntry[]): Promise<void> {
+async function pushOne(
+  sessionId: string,
+  name: `${string}/${string}`,
+  files: FileEntry[],
+): Promise<void> {
   try {
     const res = await partnerSkillApi.uploadSessionSkill(sessionId, { name, files });
     // eslint-disable-next-line no-console
