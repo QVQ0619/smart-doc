@@ -30,6 +30,12 @@ vi.mock("../blade/config", () => ({
   getBizRoleId: () => undefined,
 }));
 
+vi.mock("../components/RuleDocChatBridge", () => ({
+  default: ({ sessionId }: { sessionId: string }) => (
+    <div data-testid="rule-bridge">bridge:{sessionId}</div>
+  ),
+}));
+
 import ChatPanel from "./ChatPanel";
 
 beforeEach(() => {
@@ -71,4 +77,12 @@ test("点击折叠按钮切换折叠态", async () => {
   expect(useChatCollapseStore.getState().collapsed).toBe(true);
   // ChatView 仍在 DOM 中（仅 CSS 隐藏，保留会话）
   expect(screen.getByTestId("chatview")).toBeInTheDocument();
+});
+
+test("会话就绪时在 ChatView 上方渲染规则文件入库桥", async () => {
+  hasToken.mockReturnValue(true);
+  render(<ChatPanel />);
+  await waitFor(() =>
+    expect(screen.getByTestId("rule-bridge")).toHaveTextContent("bridge:s-123"),
+  );
 });

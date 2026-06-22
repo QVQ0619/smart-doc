@@ -8,6 +8,7 @@ import { useSessionStore } from "@blade-hq/agent-kit/react";
 import { bladeClient } from "../blade/client";
 import { hasToken, getSolutionId, getBizRoleId } from "../blade/config";
 import { useChatCollapseStore } from "../store/useChatCollapseStore";
+import RuleDocChatBridge from "../components/RuleDocChatBridge";
 
 export default function ChatPanel() {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -143,7 +144,10 @@ export default function ChatPanel() {
               </div>
             </div>
           ) : sessionId ? (
-            <ChatView sessionId={sessionId} />
+            <>
+              <RuleDocChatBridge sessionId={sessionId} />
+              <ChatView sessionId={sessionId} />
+            </>
           ) : (
             <div style={{ padding: 24, color: "#86909c", fontSize: 13 }}>
               正在创建会话…
