@@ -25,7 +25,11 @@ export default function StandardDocLibrary() {
   const qc = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const listQuery = useQuery({ queryKey: KEY, queryFn: listStandardDocs });
+  const listQuery = useQuery({
+    queryKey: KEY,
+    queryFn: listStandardDocs,
+    refetchInterval: 10000,
+  });
 
   const uploadMut = useMutation({
     mutationFn: (files: File[]) => uploadStandardDocs(files),

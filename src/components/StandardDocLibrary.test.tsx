@@ -55,3 +55,19 @@ test("删除经确认调用 deleteStandardDoc", async () => {
   await userEvent.click(await screen.findByRole("button", { name: /确.?定/ }));
   await waitFor(() => expect(vi.mocked(api.deleteStandardDoc)).toHaveBeenCalledWith(1));
 });
+
+test("规则库页挂载时每 10 秒轮询刷新列表", async () => {
+  vi.useFakeTimers();
+  try {
+    vi.clearAllMocks();
+    renderLib();
+    // 刷新初始 microtask, 让首次 fetch 落地
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.mocked(api.listStandardDocs)).toHaveBeenCalledTimes(1);
+    // 前进 10s 触发轮询
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(vi.mocked(api.listStandardDocs)).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
