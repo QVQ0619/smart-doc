@@ -12,6 +12,7 @@ vi.mock("../api/standardDocs", async () => {
     uploadStandardDocs: vi.fn(),
     deleteStandardDoc: vi.fn(),
     recognizeStandardDoc: vi.fn(),
+    listClauses: vi.fn(),
   };
 });
 
@@ -37,6 +38,9 @@ beforeEach(() => {
   vi.mocked(api.recognizeStandardDoc).mockResolvedValue({
     doc_id: 1, doc_code: "SD-abc", recognition_status: "done", segment_count: 9, page_count: 2, error: null,
   } as never);
+  vi.mocked(api.listClauses).mockResolvedValue([
+    { id: 1, clause_no: "第一条", clause_text: "申请人应当具有高级职称。", source_segment_id: 5, page_no: 2, locator: { page: 2, block_index: 1 } },
+  ] as never);
 });
 
 test("渲染列表中的规则文件标题", async () => {
@@ -71,6 +75,16 @@ test("点重新识别调用 recognizeStandardDoc", async () => {
   await screen.findByText("政策A");
   await userEvent.click(screen.getByRole("button", { name: "重新识别" }));
   await waitFor(() => expect(vi.mocked(api.recognizeStandardDoc)).toHaveBeenCalledWith(1));
+});
+
+test("展开文档行显示抽取的条款与出处", async () => {
+  const { container } = renderLib();
+  await screen.findByText("政策A");
+  const expandBtn = container.querySelector(".ant-table-row-expand-icon") as HTMLElement;
+  await userEvent.click(expandBtn);
+  expect(await screen.findByText("第一条")).toBeInTheDocument();
+  expect(await screen.findByText("申请人应当具有高级职称。")).toBeInTheDocument();
+  expect(await screen.findByText(/第2页/)).toBeInTheDocument();
 });
 
 test("规则库页挂载时每 10 秒轮询刷新列表", async () => {

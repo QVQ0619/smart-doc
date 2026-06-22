@@ -10,7 +10,9 @@ import {
   deleteStandardDoc,
   downloadStandardDocUrl,
   recognizeStandardDoc,
+  listClauses,
   type StandardDoc,
+  type Clause,
 } from "../api/standardDocs";
 
 function humanSize(bytes: number | null): string {
@@ -21,6 +23,28 @@ function humanSize(bytes: number | null): string {
 }
 
 const KEY = ["standard-docs"];
+
+function clauseProvenance(c: Clause): string {
+  const loc = c.locator ?? {};
+  const raw = (loc["block_index"] ?? loc["para_index"]);
+  const segPart = typeof raw === "number" ? `第${raw + 1}段` : "";
+  if (c.page_no != null) return `第${c.page_no}页${segPart}`;
+  return segPart || "—";
+}
+
+const CLAUSE_COLS: ColumnsType<Clause> = [
+  { title: "条号", dataIndex: "clause_no", key: "clause_no", width: 120 },
+  { title: "条文", dataIndex: "clause_text", key: "clause_text" },
+  { title: "出处", key: "prov", width: 160, render: (_: unknown, c: Clause) => clauseProvenance(c) },
+];
+
+function ClauseList({ docId }: { docId: number }) {
+  const q = useQuery({ queryKey: ["clauses", docId], queryFn: () => listClauses(docId) });
+  if (q.isLoading) return <span>加载中…</span>;
+  const data = q.data ?? [];
+  if (!data.length) return <span>尚未抽取，可在聊天里让 AI 抽取本文档规则</span>;
+  return <Table rowKey="id" size="small" dataSource={data} columns={CLAUSE_COLS} pagination={false} />;
+}
 
 export default function StandardDocLibrary() {
   const qc = useQueryClient();
@@ -144,6 +168,7 @@ export default function StandardDocLibrary() {
         dataSource={listQuery.data ?? []}
         columns={columns}
         pagination={false}
+        expandable={{ expandedRowRender: (row: StandardDoc) => <ClauseList docId={row.id} /> }}
       />
     </div>
   );

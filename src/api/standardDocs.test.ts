@@ -5,6 +5,7 @@ import {
   deleteStandardDoc,
   downloadStandardDocUrl,
   recognizeStandardDoc,
+  listClauses,
 } from "./standardDocs";
 
 const fetchMock = vi.fn();
@@ -55,4 +56,14 @@ test("recognizeStandardDoc 发 POST 到识别接口", async () => {
   const res = await recognizeStandardDoc(3);
   expect(fetchMock).toHaveBeenCalledWith("/api/standard-docs/3/recognize", { method: "POST" });
   expect(res.segment_count).toBe(7);
+});
+
+test("listClauses 发 GET 到条款接口", async () => {
+  fetchMock.mockResolvedValue({
+    ok: true, status: 200,
+    json: async () => [{ id: 1, clause_no: "第一条", clause_text: "x", source_segment_id: 5, page_no: 2, locator: { page: 2, block_index: 1 } }],
+  });
+  const res = await listClauses(9);
+  expect(fetchMock).toHaveBeenCalledWith("/api/standard-docs/9/clauses");
+  expect(res[0].clause_no).toBe("第一条");
 });

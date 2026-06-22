@@ -64,3 +64,16 @@ export function recognizeStandardDoc(id: number): Promise<RecognizeResult> {
     handle<RecognizeResult>(r),
   );
 }
+
+export interface Clause {
+  id: number;
+  clause_no: string;
+  clause_text: string | null;
+  source_segment_id: number | null;
+  page_no: number | null;
+  locator: Record<string, unknown> | null;
+}
+
+export function listClauses(docId: number): Promise<Clause[]> {
+  return fetch(`/api/standard-docs/${docId}/clauses`).then((r) => handle<Clause[]>(r));
+}
