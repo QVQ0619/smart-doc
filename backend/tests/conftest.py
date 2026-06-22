@@ -61,9 +61,10 @@ def storage_dir(tmp_path):
 def client(_test_db, storage_dir):
     from app.storage import FileStorage, get_storage
 
-    # 清理本期涉及的表（FK 关闭，顺序无关）
+    # 清理本期涉及的表（先删子表 parse_segment，再删父表）
     with Session(engine) as s:
         s.execute(text("SET FOREIGN_KEY_CHECKS=0"))
+        s.execute(text("DELETE FROM parse_segment"))
         s.execute(text("DELETE FROM standard_doc"))
         s.execute(text("DELETE FROM file_object"))
         s.execute(text("SET FOREIGN_KEY_CHECKS=1"))

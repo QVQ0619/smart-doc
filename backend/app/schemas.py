@@ -12,6 +12,9 @@ class StandardDocOut(BaseModel):
     size_bytes: Optional[int]
     mime_type: Optional[str]
     created_at: Optional[datetime]
+    recognition_status: str
+    segment_count: Optional[int] = None
+    page_count: Optional[int] = None
 
 
 class FailedItem(BaseModel):

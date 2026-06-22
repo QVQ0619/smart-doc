@@ -9,13 +9,14 @@ from sqlmodel import Session
 from ..config import get_max_upload_bytes
 from ..db import get_session
 from ..models import FileObject, StandardDoc
-from ..schemas import FailedItem, StandardDocOut, UploadResult
+from ..recognition import recognize_standard_doc
+from ..schemas import FailedItem, RecognizeResult, StandardDocOut, UploadResult
 from ..storage import FileStorage, FileTooLargeError, get_storage
 
 router = APIRouter(tags=["standard_docs"])
 
 
-def _to_out(sd: StandardDoc, fo: FileObject) -> StandardDocOut:
+def _to_out(sd: StandardDoc, fo: FileObject, *, segment_count=None, page_count=None) -> StandardDocOut:
     return StandardDocOut(
         id=sd.id,
         doc_code=sd.doc_code,
@@ -24,6 +25,9 @@ def _to_out(sd: StandardDoc, fo: FileObject) -> StandardDocOut:
         size_bytes=fo.size_bytes,
         mime_type=fo.mime_type,
         created_at=sd.created_at,
+        recognition_status=sd.recognition_status,
+        segment_count=segment_count,
+        page_count=page_count,
     )
 
 
@@ -79,7 +83,17 @@ def upload_standard_docs(
             failed.append(FailedItem(name=name, reason=f"入库失败: {e}"))
             continue
 
-        uploaded.append(_to_out(sd, fo))
+        rec = None
+        try:
+            rec = recognize_standard_doc(db, storage, sd.id)
+            db.refresh(sd)
+        except Exception:  # noqa: BLE001  双保险：识别异常绝不影响上传结果
+            pass
+        uploaded.append(_to_out(
+            sd, fo,
+            segment_count=rec.segment_count if rec else None,
+            page_count=rec.page_count if rec else None,
+        ))
 
     return UploadResult(uploaded=uploaded, failed=failed)
 
@@ -93,6 +107,18 @@ def list_standard_docs(db: Session = Depends(get_session)) -> list[StandardDocOu
         .order_by(StandardDoc.created_at.desc(), StandardDoc.id.desc())
     ).all()
     return [_to_out(sd, fo) for sd, fo in rows]
+
+
+@router.post("/standard-docs/{doc_id}/recognize", response_model=RecognizeResult)
+def recognize_endpoint(
+    doc_id: int,
+    db: Session = Depends(get_session),
+    storage: FileStorage = Depends(get_storage),
+) -> RecognizeResult:
+    sd = db.get(StandardDoc, doc_id)
+    if sd is None or not sd.is_active:
+        raise HTTPException(status_code=404, detail="standard_doc not found")
+    return recognize_standard_doc(db, storage, doc_id)
 
 
 @router.get("/standard-docs/{doc_id}/download")

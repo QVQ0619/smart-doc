@@ -142,3 +142,54 @@ def test_download_404_when_file_object_soft_deleted_even_if_doc_active(client):
         s.commit()
 
     assert client.get(f"/api/standard-docs/{doc['id']}/download").status_code == 404
+
+
+def test_upload_docx_auto_recognized(client):
+    import io
+    from docx import Document
+    d = Document()
+    d.add_heading("第一章", level=1)
+    d.add_paragraph("正文。")
+    buf = io.BytesIO()
+    d.save(buf)
+    r = client.post(
+        "/api/standard-docs",
+        files=[("files", ("规范.docx", buf.getvalue(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))],
+    )
+    assert r.status_code == 200
+    doc = r.json()["uploaded"][0]
+    assert doc["recognition_status"] == "done"
+    assert doc["segment_count"] >= 2
+
+
+def test_list_includes_recognition_status(client):
+    client.post("/api/standard-docs", files=[("files", ("a.txt", b"x", "text/plain"))])
+    rows = client.get("/api/standard-docs").json()
+    assert "recognition_status" in rows[0]
+    # .txt 不支持 → failed
+    assert rows[0]["recognition_status"] == "failed"
+
+
+def test_recognize_endpoint_returns_result(client):
+    import io
+    from docx import Document
+    d = Document()
+    d.add_paragraph("仅一段。")
+    buf = io.BytesIO()
+    d.save(buf)
+    doc = client.post(
+        "/api/standard-docs",
+        files=[("files", ("b.docx", buf.getvalue(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))],
+    ).json()["uploaded"][0]
+    r = client.post(f"/api/standard-docs/{doc['id']}/recognize")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["doc_id"] == doc["id"]
+    assert body["recognition_status"] == "done"
+    assert body["segment_count"] >= 1
+
+
+def test_recognize_unknown_404(client):
+    assert client.post("/api/standard-docs/999999/recognize").status_code == 404
