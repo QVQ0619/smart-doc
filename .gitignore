@@ -15,3 +15,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 backend/.env
+
+# 本地下载的工具二进制(cloudflared 等),不入库
+.tools/
