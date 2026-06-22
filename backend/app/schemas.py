@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -34,3 +34,35 @@ class RecognizeResult(BaseModel):
     segment_count: int
     page_count: Optional[int] = None
     error: Optional[str] = None
+
+
+class SegmentOut(BaseModel):
+    id: int
+    page_no: Optional[int]
+    locator: Optional[Any]
+    segment_type: str
+    content_text: Optional[str]
+
+
+class ClauseIn(BaseModel):
+    clause_no: str
+    clause_text: Optional[str] = None
+    source_segment_id: Optional[int] = None
+
+
+class ClauseBatchIn(BaseModel):
+    clauses: list[ClauseIn]
+
+
+class ClauseWriteResult(BaseModel):
+    inserted: int
+    missing_provenance: int
+
+
+class ClauseOut(BaseModel):
+    id: int
+    clause_no: str
+    clause_text: Optional[str]
+    source_segment_id: Optional[int]
+    page_no: Optional[int]
+    locator: Optional[Any]
