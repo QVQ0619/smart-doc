@@ -95,7 +95,7 @@ def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> Re
             doc_id=doc_id, doc_code="", recognition_status="failed",
             segment_count=0, page_count=None, error="文档记录不存在",
         )
-    fo = db.get(FileObject, sd.file_id) if sd and sd.file_id else None
+    fo = db.get(FileObject, sd.file_id) if sd.file_id else None
     ext = (Path(fo.file_name).suffix.lower() if fo else "")
     status, error, drafts = "failed", None, []
     try:

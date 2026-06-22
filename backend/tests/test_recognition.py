@@ -104,3 +104,18 @@ def test_recognize_doc_not_found_fails_without_raising(storage_dir, _test_db):
     assert res.recognition_status == "failed"
     assert res.segment_count == 0
     assert res.error  # 非空中文原因
+
+
+def test_recognize_pdf_no_text_fails_with_scanned_hint(tmp_path, storage_dir, _test_db, monkeypatch):
+    import app.recognition as recmod
+    storage = FileStorage(storage_dir)
+    src = tmp_path / "scan.pdf"
+    src.write_bytes(b"%PDF-1.4 fake")  # 内容无所谓，parse_pdf 被 mock
+    doc_id = _seed_doc(storage, src, "scan.pdf")
+    monkeypatch.setattr(recmod, "parse_pdf", lambda path: [])
+    with Session(engine) as db:
+        res = recognize_standard_doc(db, storage, doc_id)
+    assert res.recognition_status == "failed"
+    assert res.segment_count == 0
+    assert "扫描件" in (res.error or "")
+    assert _count_segments(doc_id) == 0
