@@ -36,8 +36,9 @@ description: 当用户要求从某已识别规则文档中抽取审查规则/条
 4. 把结果写成 JSON 文件并入库（用第 2 步首行的 doc_id）：
    ```bash
    cat > /tmp/clauses.json <<'JSON'
-   {"clauses":[{"clause_no":"第一条","clause_text":"...","source_segment_id":12}]}
+   {"clauses":[{"clause_no":"第一条","clause_text":"申请人应当具有高级专业技术职称。","source_segment_id":12}]}
    JSON
+   # 上面是示例：clause_text 必须替换为该条真实条文（取自对应段落），切勿照抄此示例文字
    SMART_DOC_API="$API" python3 "$DIR/smart_doc_clauses.py" "<doc_id>" /tmp/clauses.json
    ```
 5. 解读返回 `inserted=<n> missing_provenance=<m>`：回报「已抽取并入库 N 条规则」；若 m>0 补一句
