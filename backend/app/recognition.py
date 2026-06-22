@@ -15,6 +15,9 @@ from .storage import FileStorage
 
 MAX_SEGMENT_CHARS = 65536
 
+# DB 约束：segment_type IN ('text','table','title','figure')
+_SEGMENT_TYPE_MAP = {"heading": "title", "paragraph": "text"}
+
 
 @dataclass
 class SegmentDraft:
@@ -87,6 +90,11 @@ def parse_docx(path: Path) -> list[SegmentDraft]:
 
 def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> RecognizeResult:
     sd = db.get(StandardDoc, doc_id)
+    if sd is None:
+        return RecognizeResult(
+            doc_id=doc_id, doc_code="", recognition_status="failed",
+            segment_count=0, page_count=None, error="文档记录不存在",
+        )
     fo = db.get(FileObject, sd.file_id) if sd and sd.file_id else None
     ext = (Path(fo.file_name).suffix.lower() if fo else "")
     status, error, drafts = "failed", None, []
@@ -114,9 +122,6 @@ def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> Re
         error = f"识别失败：{str(e)[:300]}"
         drafts = []
 
-    # DB 约束：segment_type IN ('text','table','title','figure')
-    _TYPE_MAP = {"heading": "title", "paragraph": "text"}
-
     if drafts and error is None:
         db.execute(delete(ParseSegment).where(ParseSegment.standard_doc_id == doc_id))
         for d in drafts:
@@ -125,7 +130,7 @@ def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> Re
                 material_file_id=None,
                 page_no=d.page_no,
                 locator=d.locator,
-                segment_type=_TYPE_MAP.get(d.segment_type, d.segment_type),
+                segment_type=_SEGMENT_TYPE_MAP.get(d.segment_type, d.segment_type),
                 content_text=d.content_text,
             ))
         status = "done"

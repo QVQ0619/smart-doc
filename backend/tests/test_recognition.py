@@ -64,6 +64,12 @@ def test_recognize_docx_writes_segments_and_done(tmp_path, storage_dir, _test_db
             {"d": doc_id},
         ).first()
     assert seg[0] == doc_id and seg[1] is None
+    with Session(engine) as s:
+        types = s.execute(sqltext(
+            "SELECT DISTINCT segment_type FROM parse_segment WHERE standard_doc_id=:d"), {"d": doc_id}
+        ).scalars().all()
+    assert set(types) <= {"text", "table", "title", "figure"}
+    assert types  # 非空
 
 
 def test_recognize_is_idempotent_replace(tmp_path, storage_dir, _test_db):
@@ -89,3 +95,12 @@ def test_recognize_unsupported_format_fails_without_raising(tmp_path, storage_di
     assert res.recognition_status == "failed"
     assert res.error and (".doc" in res.error)
     assert _count_segments(doc_id) == 0
+
+
+def test_recognize_doc_not_found_fails_without_raising(storage_dir, _test_db):
+    storage = FileStorage(storage_dir)
+    with Session(engine) as db:
+        res = recognize_standard_doc(db, storage, 999999)
+    assert res.recognition_status == "failed"
+    assert res.segment_count == 0
+    assert res.error  # 非空中文原因
