@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -105,7 +105,7 @@ def download_standard_doc(
     if sd is None or not sd.is_active:
         raise HTTPException(status_code=404, detail="standard_doc not found")
     fo = db.get(FileObject, sd.file_id) if sd.file_id else None
-    if fo is None:
+    if fo is None or fo.deleted_at is not None:
         raise HTTPException(status_code=404, detail="file_object missing")
     path = storage.base_dir / fo.object_key
     if not path.exists():
@@ -122,7 +122,7 @@ def delete_standard_doc(doc_id: int, db: Session = Depends(get_session)):
     if sd.file_id:
         fo = db.get(FileObject, sd.file_id)
         if fo is not None:
-            fo.deleted_at = datetime.now(timezone.utc)
+            fo.deleted_at = datetime.now()  # 本地基准, 与 created_at 的 CURRENT_TIMESTAMP 一致
             db.add(fo)
     db.add(sd)
     db.commit()

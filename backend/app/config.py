@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SMART_", env_file=".env", extra="ignore")
 
     database_url: str = "mysql+pymysql://root:root@localhost:3306/smart"
-    storage_dir: str = "./storage/uploads"
+    storage_dir: str = "./storage"
     max_upload_mb: int = 50
     cors_origins: str = "http://localhost:3200"
 

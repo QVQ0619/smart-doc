@@ -121,3 +121,24 @@ def test_delete_soft_removes_from_list_but_keeps_file(client, storage_dir):
 
 def test_delete_unknown_404(client):
     assert client.delete("/api/standard-docs/999999").status_code == 404
+
+
+def test_download_404_when_file_object_soft_deleted_even_if_doc_active(client):
+    # 与列表读路径口径一致: file_object.deleted_at 非空即不可下载,
+    # 即便 standard_doc 仍 is_active (构造该中间态需直接改库)
+    from datetime import datetime
+
+    from sqlmodel import Session
+
+    from app.db import engine
+    from app.models import FileObject, StandardDoc
+
+    doc = _upload_one(client, "x.txt", b"bytes")
+    with Session(engine) as s:
+        sd = s.get(StandardDoc, doc["id"])
+        fo = s.get(FileObject, sd.file_id)
+        fo.deleted_at = datetime.now()
+        s.add(fo)
+        s.commit()
+
+    assert client.get(f"/api/standard-docs/{doc['id']}/download").status_code == 404
