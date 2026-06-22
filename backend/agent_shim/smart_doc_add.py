@@ -83,6 +83,10 @@ def main(argv: list[str]) -> int:
         sys.stdout.write(
             f"doc_code={doc.get('doc_code')} title={doc.get('title')} file={doc.get('file_name')}\n"
         )
+        if "recognition_status" in doc:
+            sys.stdout.write(
+                f"recognition={doc.get('recognition_status')} segments={doc.get('segment_count')}\n"
+            )
     failed = result.get("failed", [])
     for f in failed:
         sys.stderr.write(f"FAILED {f.get('name')}: {f.get('reason')}\n")

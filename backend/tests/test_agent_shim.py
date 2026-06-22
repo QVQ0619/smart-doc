@@ -97,3 +97,30 @@ def test_main_missing_api_env_returns_6(tmp_path, monkeypatch):
     f = tmp_path / "a.txt"
     f.write_bytes(b"a")
     assert main(["smart-doc-add", str(f)]) == 6
+
+
+def test_main_prints_recognition_summary_when_present(tmp_path, monkeypatch, capsys, stub_server):
+    base, handler = stub_server
+    handler.status = 200
+    handler.payload = {"uploaded": [{"doc_code": "SD-x", "title": "T", "file_name": "T.docx",
+                                     "recognition_status": "done", "segment_count": 5}], "failed": []}
+    monkeypatch.setenv("SMART_DOC_API", base)
+    f = tmp_path / "T.docx"
+    f.write_bytes(b"x")
+    assert main(["smart-doc-add", str(f)]) == 0
+    out = capsys.readouterr().out
+    assert "recognition=done" in out
+    assert "segments=5" in out
+
+
+def test_main_no_recognition_field_is_backward_compatible(tmp_path, monkeypatch, capsys, stub_server):
+    base, handler = stub_server
+    handler.status = 200
+    handler.payload = {"uploaded": [{"doc_code": "SD-y", "title": "T", "file_name": "T.pdf"}], "failed": []}
+    monkeypatch.setenv("SMART_DOC_API", base)
+    f = tmp_path / "T.pdf"
+    f.write_bytes(b"x")
+    assert main(["smart-doc-add", str(f)]) == 0
+    out = capsys.readouterr().out
+    assert "doc_code=SD-y" in out
+    assert "recognition=" not in out
