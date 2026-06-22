@@ -8,6 +8,7 @@ import { useSessionStore } from "@blade-hq/agent-kit/react";
 import { bladeClient } from "../blade/client";
 import { hasToken, getSolutionId, getBizRoleId } from "../blade/config";
 import { useChatCollapseStore } from "../store/useChatCollapseStore";
+import { pushRuleDocSkill } from "../blade/sessionSkill";
 
 export default function ChatPanel() {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -45,6 +46,7 @@ export default function ChatPanel() {
       }
       setSessionId(result.session_id);
       useSessionStore.getState().setActiveSession(result.session_id);
+      void pushRuleDocSkill(result.session_id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

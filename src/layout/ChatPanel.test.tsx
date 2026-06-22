@@ -30,7 +30,12 @@ vi.mock("../blade/config", () => ({
   getBizRoleId: () => undefined,
 }));
 
+vi.mock("../blade/sessionSkill", () => ({
+  pushRuleDocSkill: vi.fn(),
+}));
+
 import ChatPanel from "./ChatPanel";
+import { pushRuleDocSkill } from "../blade/sessionSkill";
 
 beforeEach(() => {
   createSession.mockClear();
@@ -71,4 +76,13 @@ test("点击折叠按钮切换折叠态", async () => {
   expect(useChatCollapseStore.getState().collapsed).toBe(true);
   // ChatView 仍在 DOM 中（仅 CSS 隐藏，保留会话）
   expect(screen.getByTestId("chatview")).toBeInTheDocument();
+});
+
+test("建会话成功后推送 save-rule-doc 技能", async () => {
+  hasToken.mockReturnValue(true);
+  render(<ChatPanel />);
+  await waitFor(() => expect(screen.getByTestId("chatview")).toBeInTheDocument());
+  await waitFor(() =>
+    expect(vi.mocked(pushRuleDocSkill)).toHaveBeenCalledWith("s-123"),
+  );
 });
