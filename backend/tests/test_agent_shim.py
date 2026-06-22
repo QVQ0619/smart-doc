@@ -68,9 +68,7 @@ def test_main_missing_file_returns_2(monkeypatch, stub_server):
     assert main(["smart-doc-add", "/no/such/file.pdf"]) == 2
 
 
-def test_main_no_args_returns_1(monkeypatch, stub_server):
-    base, _ = stub_server
-    monkeypatch.setenv("SMART_DOC_API", base)
+def test_main_no_args_returns_1():
     assert main(["smart-doc-add"]) == 1
 
 

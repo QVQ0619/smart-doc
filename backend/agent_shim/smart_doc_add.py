@@ -20,7 +20,7 @@ from pathlib import Path
 FIELD = "files"
 
 
-def build_multipart(paths):
+def build_multipart(paths: list[str]) -> tuple[bytes, str]:
     """构造 multipart/form-data, 每个文件放在字段 'files'. 返回 (body: bytes, content_type: str)."""
     boundary = uuid.uuid4().hex
     crlf = b"\r\n"
@@ -40,7 +40,7 @@ def build_multipart(paths):
     return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
 
-def upload(api_base, paths, timeout):
+def upload(api_base: str, paths: list[str], timeout: int) -> dict:
     """POST 到 {api_base}/api/standard-docs, 返回解析后的 dict.
     非2xx 抛 urllib.error.HTTPError; 连接失败抛 urllib.error.URLError."""
     body, ctype = build_multipart(paths)
@@ -50,7 +50,7 @@ def upload(api_base, paths, timeout):
         return json.loads(resp.read().decode("utf-8"))
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
     paths = argv[1:]
     if not paths:
         sys.stderr.write("用法: smart-doc-add <path> [<path> ...]\n")
@@ -75,6 +75,9 @@ def main(argv):
     except urllib.error.URLError as e:
         sys.stderr.write(f"[smart-doc-add] 网络错误: {e.reason}\n")
         return 3
+    except OSError as e:
+        sys.stderr.write(f"[smart-doc-add] 文件读取失败: {e}\n")
+        return 2
 
     for doc in result.get("uploaded", []):
         sys.stdout.write(
