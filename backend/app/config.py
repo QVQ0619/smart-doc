@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     storage_dir: str = "./storage"
     max_upload_mb: int = 50
     cors_origins: str = "http://localhost:3200"
+    # 监听地址：默认 0.0.0.0 对外可达（供远程 agent / 隧道访问）。
+    # 仅本机访问可设 SMART_HOST=127.0.0.1。
+    host: str = "0.0.0.0"
+    port: int = 8000
 
     @property
     def max_upload_bytes(self) -> int:
