@@ -105,3 +105,47 @@ export interface Rule {
 export function listRules(docId: number): Promise<Rule[]> {
   return fetch(`/api/standard-docs/${docId}/rules`).then((r) => handle<Rule[]>(r));
 }
+
+export interface ClauseUpdate {
+  clause_no: string;
+  clause_text: string | null;
+}
+
+export interface RuleUpdate {
+  name: string;
+  logic: string | null;
+  dimension_code: string;
+  decision_type: string;
+  disposition: string;
+  binding_class: string;
+}
+
+export function updateClause(docId: number, clauseId: number, body: ClauseUpdate): Promise<Clause> {
+  return fetch(`/api/standard-docs/${docId}/clauses/${clauseId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body),
+  }).then((r) => handle<Clause>(r));
+}
+
+export function deleteClause(docId: number, clauseId: number): Promise<void> {
+  return fetch(`/api/standard-docs/${docId}/clauses/${clauseId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  }).then((r) => handle<void>(r));
+}
+
+export function updateRule(docId: number, ruleId: number, body: RuleUpdate): Promise<Rule> {
+  return fetch(`/api/standard-docs/${docId}/rules/${ruleId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body),
+  }).then((r) => handle<Rule>(r));
+}
+
+export function deleteRule(docId: number, ruleId: number): Promise<void> {
+  return fetch(`/api/standard-docs/${docId}/rules/${ruleId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  }).then((r) => handle<void>(r));
+}

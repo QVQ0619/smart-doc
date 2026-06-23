@@ -6,6 +6,10 @@ import {
   downloadStandardDocUrl,
   recognizeStandardDoc,
   listClauses,
+  updateClause,
+  deleteClause,
+  updateRule,
+  deleteRule,
 } from "./standardDocs";
 
 const fetchMock = vi.fn();
@@ -76,4 +80,42 @@ test("listClauses 发 GET 到条款接口", async () => {
   const res = await listClauses(9);
   expect(fetchMock).toHaveBeenCalledWith("/api/standard-docs/9/clauses");
   expect(res[0].clause_no).toBe("第一条");
+});
+
+test("updateClause 发 PATCH 带 JSON body", async () => {
+  fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 3, clause_no: "第二条" }) });
+  await updateClause(9, 3, { clause_no: "第二条", clause_text: "新" });
+  const [url, init] = fetchMock.mock.calls[0];
+  expect(url).toBe("/api/standard-docs/9/clauses/3");
+  expect(init.method).toBe("PATCH");
+  expect(JSON.parse(init.body)).toEqual({ clause_no: "第二条", clause_text: "新" });
+  expect(init.headers["Content-Type"]).toBe("application/json");
+});
+
+test("deleteClause 发 DELETE", async () => {
+  fetchMock.mockResolvedValue({ ok: true, status: 204 });
+  await deleteClause(9, 3);
+  const [url, init] = fetchMock.mock.calls[0];
+  expect(url).toBe("/api/standard-docs/9/clauses/3");
+  expect(init.method).toBe("DELETE");
+});
+
+test("updateRule 发 PATCH 带 JSON body", async () => {
+  fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 5, name: "规则B" }) });
+  await updateRule(9, 5, {
+    name: "规则B", logic: null, dimension_code: "rationality",
+    decision_type: "verify", disposition: "fix", binding_class: "parameterized",
+  });
+  const [url, init] = fetchMock.mock.calls[0];
+  expect(url).toBe("/api/standard-docs/9/rules/5");
+  expect(init.method).toBe("PATCH");
+  expect(JSON.parse(init.body).dimension_code).toBe("rationality");
+});
+
+test("deleteRule 发 DELETE", async () => {
+  fetchMock.mockResolvedValue({ ok: true, status: 204 });
+  await deleteRule(9, 5);
+  const [url, init] = fetchMock.mock.calls[0];
+  expect(url).toBe("/api/standard-docs/9/rules/5");
+  expect(init.method).toBe("DELETE");
 });
