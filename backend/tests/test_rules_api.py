@@ -1,4 +1,3 @@
-from sqlalchemy import text as sqltext
 from sqlmodel import Session
 
 from app.db import engine
@@ -49,6 +48,7 @@ def test_get_rules_returns_struct_and_provenance(client):
     assert row["binding_class"] == "common"
     assert row["source_clause_id"] == c1
     assert row["clause_no"] == "二(一)1"
+    assert row["clause_text"] == "同年只能申请1项同类型项目"
     assert row["page_no"] == 5
     assert row["locator"]["block_index"] == 0
 
