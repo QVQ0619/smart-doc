@@ -20,49 +20,42 @@ beforeEach(() => {
   uploadSessionSkill.mockReset().mockResolvedValue({
     name: "local/save-rule-doc",
     skill_dir: "/sandbox/.agent/skills/save-rule-doc",
-    file_count: 3,
+    file_count: 4,
     overwritten: false,
   });
   toast.warning.mockReset();
 });
 
-test("配了 VITE_SMART_DOC_API → 推送三个 skill(save-rule-doc + extract-review-rules + structure-review-rules)", async () => {
+test("配了 env → 推送两个 skill(save-rule-doc + 一步 extract-rules)，各带 api_base/api_key", async () => {
   vi.stubEnv("VITE_SMART_DOC_API", "https://t.example.com");
   vi.stubEnv("VITE_SMART_DOC_API_KEY", "k-secret");
   await pushRuleDocSkill("s-1");
 
-  expect(uploadSessionSkill).toHaveBeenCalledTimes(3);
+  expect(uploadSessionSkill).toHaveBeenCalledTimes(2);
+
   const [sid0, p0] = uploadSessionSkill.mock.calls[0] as [string, { name: string; files: FileEntry[] }];
   expect(sid0).toBe("s-1");
   expect(p0.name).toBe("local/save-rule-doc");
-  expect(p0.files.map((f) => f.path)).toEqual(["SKILL.md", "scripts/smart_doc_add.py", "scripts/api_base.txt", "scripts/api_key.txt"]);
+  expect(p0.files.map((f) => f.path)).toEqual([
+    "SKILL.md", "scripts/smart_doc_add.py", "scripts/api_base.txt", "scripts/api_key.txt",
+  ]);
 
   const [sid1, p1] = uploadSessionSkill.mock.calls[1] as [string, { name: string; files: FileEntry[] }];
   expect(sid1).toBe("s-1");
-  expect(p1.name).toBe("local/extract-review-rules");
+  expect(p1.name).toBe("local/extract-rules");
   expect(p1.files.map((f) => f.path)).toEqual([
-    "SKILL.md", "scripts/smart_doc_segments.py", "scripts/smart_doc_clauses.py", "scripts/api_base.txt", "scripts/api_key.txt",
+    "SKILL.md", "scripts/smart_doc_segments.py", "scripts/smart_doc_extract_rules.py",
+    "scripts/api_base.txt", "scripts/api_key.txt",
   ]);
-  const api1 = p1.files.find((f) => f.path === "scripts/api_base.txt")!;
-  expect(api1.content).toBe("https://t.example.com");
-  const key1 = p1.files.find((f) => f.path === "scripts/api_key.txt")!;
-  expect(key1.content).toBe("k-secret");
-
-  const [sid2, p2] = uploadSessionSkill.mock.calls[2] as [string, { name: string; files: FileEntry[] }];
-  expect(sid2).toBe("s-1");
-  expect(p2.name).toBe("local/structure-review-rules");
-  expect(p2.files.map((f) => f.path)).toEqual([
-    "SKILL.md", "scripts/smart_doc_list_clauses.py", "scripts/smart_doc_rules.py", "scripts/api_base.txt", "scripts/api_key.txt",
-  ]);
-  const api2 = p2.files.find((f) => f.path === "scripts/api_base.txt")!;
-  expect(api2.content).toBe("https://t.example.com");
+  expect(p1.files.find((f) => f.path === "scripts/api_base.txt")!.content).toBe("https://t.example.com");
+  expect(p1.files.find((f) => f.path === "scripts/api_key.txt")!.content).toBe("k-secret");
 });
 
-test("未配 env → toast.warning 且三个 skill 的 api_base.txt 为空串，仍推送", async () => {
+test("未配 env → toast.warning 且两个 skill 的 api_base.txt 为空串，仍推送", async () => {
   vi.stubEnv("VITE_SMART_DOC_API", "");
   await pushRuleDocSkill("s-2");
   expect(toast.warning).toHaveBeenCalled();
-  expect(uploadSessionSkill).toHaveBeenCalledTimes(3);
+  expect(uploadSessionSkill).toHaveBeenCalledTimes(2);
   for (const call of uploadSessionSkill.mock.calls) {
     const payload = call[1] as { files: FileEntry[] };
     expect(payload.files.find((f) => f.path === "scripts/api_base.txt")!.content).toBe("");

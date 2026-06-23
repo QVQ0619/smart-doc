@@ -2,16 +2,12 @@ import { toast } from "sonner";
 import { partnerSkillApi } from "@blade-hq/agent-kit/react";
 import SKILL_MD from "../../blade/skills/save-rule-doc/SKILL.md?raw";
 import SHIM_PY from "../../backend/agent_shim/smart_doc_add.py?raw";
-import EXTRACT_SKILL_MD from "../../blade/skills/extract-review-rules/SKILL.md?raw";
+import EXTRACT_RULES_SKILL_MD from "../../blade/skills/extract-rules/SKILL.md?raw";
 import SEGMENTS_PY from "../../backend/agent_shim/smart_doc_segments.py?raw";
-import CLAUSES_PY from "../../backend/agent_shim/smart_doc_clauses.py?raw";
-import STRUCT_SKILL_MD from "../../blade/skills/structure-review-rules/SKILL.md?raw";
-import LIST_CLAUSES_PY from "../../backend/agent_shim/smart_doc_list_clauses.py?raw";
-import RULES_PY from "../../backend/agent_shim/smart_doc_rules.py?raw";
+import EXTRACT_RULES_PY from "../../backend/agent_shim/smart_doc_extract_rules.py?raw";
 
 const SAVE_SKILL_NAME = "local/save-rule-doc";
-const EXTRACT_SKILL_NAME = "local/extract-review-rules";
-const STRUCT_SKILL_NAME = "local/structure-review-rules";
+const EXTRACT_RULES_SKILL_NAME = "local/extract-rules";
 
 type FileEntry = { path: string; content: string };
 
@@ -40,7 +36,9 @@ async function pushOne(
 }
 
 /**
- * 把规则相关技能推送到指定会话（agent 沙箱）：save-rule-doc + extract-review-rules。
+ * 把规则相关技能推送到指定会话（agent 沙箱）：
+ * - save-rule-doc：上传文件入规则库
+ * - extract-rules：**一步**从已识别文档抽取依据条款 + 审查规则（取代原先分步的 extract + structure）
  * best-effort：任何单个失败只 toast.warning，绝不抛出阻断会话/聊天。
  */
 export async function pushRuleDocSkill(sessionId: string): Promise<void> {
@@ -55,17 +53,10 @@ export async function pushRuleDocSkill(sessionId: string): Promise<void> {
     { path: "scripts/api_base.txt", content: apiBase ?? "" },
     { path: "scripts/api_key.txt", content: apiKey ?? "" },
   ]);
-  await pushOne(sessionId, EXTRACT_SKILL_NAME, [
-    { path: "SKILL.md", content: EXTRACT_SKILL_MD },
+  await pushOne(sessionId, EXTRACT_RULES_SKILL_NAME, [
+    { path: "SKILL.md", content: EXTRACT_RULES_SKILL_MD },
     { path: "scripts/smart_doc_segments.py", content: SEGMENTS_PY },
-    { path: "scripts/smart_doc_clauses.py", content: CLAUSES_PY },
-    { path: "scripts/api_base.txt", content: apiBase ?? "" },
-    { path: "scripts/api_key.txt", content: apiKey ?? "" },
-  ]);
-  await pushOne(sessionId, STRUCT_SKILL_NAME, [
-    { path: "SKILL.md", content: STRUCT_SKILL_MD },
-    { path: "scripts/smart_doc_list_clauses.py", content: LIST_CLAUSES_PY },
-    { path: "scripts/smart_doc_rules.py", content: RULES_PY },
+    { path: "scripts/smart_doc_extract_rules.py", content: EXTRACT_RULES_PY },
     { path: "scripts/api_base.txt", content: apiBase ?? "" },
     { path: "scripts/api_key.txt", content: apiKey ?? "" },
   ]);

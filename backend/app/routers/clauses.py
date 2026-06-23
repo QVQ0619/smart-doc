@@ -7,9 +7,10 @@ from ..db import get_session
 from ..extraction import replace_clauses
 from ..models import (ParseSegment, RegulationClause, ReviewDimension, ReviewRule,
                       ReviewRuleClause, ReviewRuleVersion, StandardDoc)
-from ..schemas import (ClauseBatchIn, ClauseOut, ClauseWriteResult, RuleBatchIn,
+from ..schemas import (ClauseBatchIn, ClauseOut, ClauseWriteResult,
+                       ExtractRulesBatchIn, ExtractRulesResult, RuleBatchIn,
                        RuleOut, RuleWriteResult, SegmentOut)
-from ..structuring import replace_rules
+from ..structuring import extract_and_structure, replace_rules
 
 router = APIRouter(tags=["clauses"])
 
@@ -63,6 +64,13 @@ def list_clauses(doc_id: int, db: Session = Depends(get_session)) -> list[Clause
 def post_rules(doc_id: int, body: RuleBatchIn, db: Session = Depends(get_session)) -> RuleWriteResult:
     _require_doc(db, doc_id)
     return replace_rules(db, doc_id, body.rules)
+
+
+@router.post("/standard-docs/{doc_id}/extract-rules", response_model=ExtractRulesResult, dependencies=[Depends(require_api_key)])
+def post_extract_rules(doc_id: int, body: ExtractRulesBatchIn, db: Session = Depends(get_session)) -> ExtractRulesResult:
+    """一步抽取：依据条款 + 审查规则 一次原子入库。"""
+    _require_doc(db, doc_id)
+    return extract_and_structure(db, doc_id, body.items)
 
 
 @router.get("/standard-docs/{doc_id}/rules", response_model=list[RuleOut])

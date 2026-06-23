@@ -11,9 +11,13 @@ import {
 const fetchMock = vi.fn();
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
+  vi.stubEnv("VITE_SMART_DOC_API_KEY", ""); // 默认无 key，隔离真实 .env 的影响
   fetchMock.mockReset();
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 test("listStandardDocs 请求列表并解析", async () => {
   fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => [{ id: 1 }] });

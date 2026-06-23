@@ -5,9 +5,10 @@ import uuid
 from sqlalchemy import delete, select, update
 from sqlmodel import Session
 
-from .models import (RegulationClause, ReviewDimension, ReviewRule,
-                     ReviewRuleClause, ReviewRuleVersion)
-from .schemas import RuleIn, RuleWriteResult
+from .models import (ParseSegment, RegulationClause, ReviewDimension, ReviewRule,
+                     ReviewRuleClause, ReviewRuleVersion, StandardDoc)
+from .schemas import (ExtractRuleItemIn, ExtractRulesResult, RuleIn,
+                      RuleWriteResult)
 
 _DECISION = {"hard", "verify", "soft"}
 _DISPOSITION = {"reject", "fix", "review"}
@@ -81,3 +82,64 @@ def replace_rules(db: Session, doc_id: int, rules: list[RuleIn]) -> RuleWriteRes
 
     db.commit()
     return RuleWriteResult(inserted=inserted, skipped=skipped)
+
+
+def extract_and_structure(db: Session, doc_id: int, items: list[ExtractRuleItemIn]) -> ExtractRulesResult:
+    """一步抽取：原子地把每个 item(条款字段+规则字段)入 regulation_clause + review_rule(1:1)。
+    按文档幂等替换(先清旧 rule cascade、再清旧 clause)。规则字段非法/空名/空条号 → 跳过整条。
+    插 clause flush 拿 id → 插 rule+version+rule_clause(关联该 id)。单次 commit。"""
+    sd = db.get(StandardDoc, doc_id)
+    if sd is None:
+        raise ValueError(f"standard_doc {doc_id} 不存在")
+    doc_code = sd.doc_code
+    valid_seg_ids = set(
+        db.execute(select(ParseSegment.id).where(ParseSegment.standard_doc_id == doc_id)).scalars().all()
+    )
+    dim_map = dict(db.execute(select(ReviewDimension.code, ReviewDimension.id)).all())
+
+    # 清旧：先 rule(cascade 复用)，再 clause
+    delete_rules_for_doc(db, doc_id)
+    db.execute(delete(RegulationClause).where(RegulationClause.standard_doc_id == doc_id))
+
+    clauses_inserted = 0
+    rules_inserted = 0
+    skipped = 0
+    missing_provenance = 0
+    for it in items:
+        if (it.dimension_code not in dim_map
+                or it.decision_type not in _DECISION
+                or it.disposition not in _DISPOSITION
+                or it.binding_class not in _BINDING
+                or not (it.name or "").strip()
+                or not (it.clause_no or "").strip()):
+            skipped += 1
+            continue
+        seg_id = it.source_segment_id
+        if seg_id is None or seg_id not in valid_seg_ids:
+            seg_id = None
+            missing_provenance += 1
+        clause = RegulationClause(
+            standard_doc_id=doc_id, doc_code=doc_code,
+            clause_no=it.clause_no, clause_text=it.clause_text, source_segment_id=seg_id,
+        )
+        db.add(clause)
+        db.flush()  # 拿 clause.id
+        clauses_inserted += 1
+        rule = ReviewRule(rule_code="RULE-" + uuid.uuid4().hex[:12], current_version_id=None)
+        db.add(rule)
+        db.flush()
+        ver = ReviewRuleVersion(
+            rule_id=rule.id, version="V1.0", dimension_id=dim_map[it.dimension_code],
+            name=it.name, logic=it.logic, decision_type=it.decision_type,
+            disposition=it.disposition, binding_class=it.binding_class,
+        )
+        db.add(ver)
+        db.flush()
+        rule.current_version_id = ver.id
+        db.add(ReviewRuleClause(rule_version_id=ver.id, clause_id=clause.id))
+        rules_inserted += 1
+    db.commit()
+    return ExtractRulesResult(
+        clauses_inserted=clauses_inserted, rules_inserted=rules_inserted,
+        skipped=skipped, missing_provenance=missing_provenance,
+    )

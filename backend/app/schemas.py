@@ -103,3 +103,29 @@ class RuleOut(BaseModel):
     clause_text: Optional[str] = None
     page_no: Optional[int] = None
     locator: Optional[Any] = None
+
+
+# —— 一步抽取：依据条款 + 审查规则 一次入库 ——
+class ExtractRuleItemIn(BaseModel):
+    # 条款字段
+    clause_no: str
+    clause_text: Optional[str] = None
+    source_segment_id: Optional[int] = None
+    # 规则字段
+    dimension_code: str
+    name: str
+    logic: Optional[str] = None
+    decision_type: str
+    disposition: str
+    binding_class: str
+
+
+class ExtractRulesBatchIn(BaseModel):
+    items: list[ExtractRuleItemIn]
+
+
+class ExtractRulesResult(BaseModel):
+    clauses_inserted: int
+    rules_inserted: int
+    skipped: int
+    missing_provenance: int
