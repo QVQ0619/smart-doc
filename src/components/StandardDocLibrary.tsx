@@ -1,4 +1,5 @@
-import { Button, Popconfirm, Space, Table, Tabs, Tag } from "antd";
+import { useState } from "react";
+import { Button, Form, Input, Modal, Popconfirm, Space, Table, Tabs, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,6 +10,8 @@ import {
   recognizeStandardDoc,
   listClauses,
   listRules,
+  updateClause,
+  deleteClause,
   type StandardDoc,
   type Clause,
   type Rule,
@@ -38,11 +41,76 @@ const CLAUSE_COLS: ColumnsType<Clause> = [
 ];
 
 function ClauseList({ docId }: { docId: number }) {
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: ["clauses", docId], queryFn: () => listClauses(docId) });
+  const [editing, setEditing] = useState<Clause | null>(null);
+  const [form] = Form.useForm();
+
+  const updateMut = useMutation({
+    mutationFn: (v: { clause_no: string; clause_text: string | null }) =>
+      updateClause(docId, editing!.id, v),
+    onSuccess: () => {
+      toast.success("已保存");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["clauses", docId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => deleteClause(docId, id),
+    onSuccess: () => {
+      toast.success("已删除");
+      qc.invalidateQueries({ queryKey: ["clauses", docId] });
+      qc.invalidateQueries({ queryKey: ["rules", docId] });   // 可能连带删了规则
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+  });
+
+  function openEdit(c: Clause) {
+    setEditing(c);
+    form.setFieldsValue({ clause_no: c.clause_no, clause_text: c.clause_text ?? "" });
+  }
+
+  const cols: ColumnsType<Clause> = [
+    ...CLAUSE_COLS,
+    {
+      title: "操作", key: "ops", width: 120,
+      render: (_: unknown, c: Clause) => (
+        <Space>
+          <a onClick={() => openEdit(c)}>编辑</a>
+          <Popconfirm title="确认删除该条款?" okText="确定" cancelText="取消"
+            onConfirm={() => deleteMut.mutate(c.id)}>
+            <a>删除</a>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
   if (q.isLoading) return <span>加载中…</span>;
   const data = q.data ?? [];
   if (!data.length) return <span>尚未抽取，可在聊天里让 AI 抽取本文档规则</span>;
-  return <Table rowKey="id" size="small" dataSource={data} columns={CLAUSE_COLS} pagination={false} />;
+  return (
+    <>
+      <Table rowKey="id" size="small" dataSource={data} columns={cols} pagination={false} />
+      <Modal
+        title="编辑条款" open={!!editing} okText="保存" cancelText="取消"
+        confirmLoading={updateMut.isPending}
+        onOk={() => form.submit()} onCancel={() => setEditing(null)} destroyOnClose
+      >
+        <Form form={form} layout="vertical"
+          onFinish={(v) => updateMut.mutate({ clause_no: v.clause_no, clause_text: v.clause_text || null })}>
+          <Form.Item name="clause_no" label="条号" rules={[{ required: true, message: "条号必填" }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="clause_text" label="条文">
+            <Input.TextArea rows={4} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  );
 }
 
 const DECISION_LABEL: Record<string, string> = { hard: "硬性", verify: "需核验", soft: "建议" };

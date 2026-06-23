@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StandardDocLibrary from "./StandardDocLibrary";
@@ -13,6 +13,10 @@ vi.mock("../api/standardDocs", async () => {
     recognizeStandardDoc: vi.fn(),
     listClauses: vi.fn(),
     listRules: vi.fn(),
+    updateClause: vi.fn(),
+    deleteClause: vi.fn(),
+    updateRule: vi.fn(),
+    deleteRule: vi.fn(),
   };
 });
 
@@ -41,6 +45,10 @@ beforeEach(() => {
     { id: 1, clause_no: "第一条", clause_text: "申请人应当具有高级职称。", source_segment_id: 5, page_no: 2, locator: { page: 2, block_index: 1 } },
   ] as never);
   vi.mocked(api.listRules).mockResolvedValue([] as never);
+  vi.mocked(api.updateClause).mockResolvedValue({} as never);
+  vi.mocked(api.deleteClause).mockResolvedValue();
+  vi.mocked(api.updateRule).mockResolvedValue({} as never);
+  vi.mocked(api.deleteRule).mockResolvedValue();
 });
 
 test("渲染列表中的规则文件标题", async () => {
@@ -100,6 +108,31 @@ test("规则库页挂载时每 10 秒轮询刷新列表", async () => {
   } finally {
     vi.useRealTimers();
   }
+});
+
+test("条款行点编辑→改条文→保存调 updateClause", async () => {
+  const { container } = renderLib();
+  await screen.findByText("政策A");
+  await userEvent.click(container.querySelector(".ant-table-row-expand-icon") as HTMLElement);
+  await userEvent.click(await screen.findByText("依据条款"));
+  const row = container.querySelector(".ant-table-expanded-row") as HTMLElement;
+  await userEvent.click(within(row).getByText("编辑"));
+  await screen.findByText("编辑条款");                         // Modal 标题
+  await userEvent.click(screen.getByRole("button", { name: /保.?存/ }));
+  await waitFor(() => expect(vi.mocked(api.updateClause)).toHaveBeenCalledWith(
+    1, 1, { clause_no: "第一条", clause_text: "申请人应当具有高级职称。" },
+  ));
+});
+
+test("条款行点删除→确认调 deleteClause", async () => {
+  const { container } = renderLib();
+  await screen.findByText("政策A");
+  await userEvent.click(container.querySelector(".ant-table-row-expand-icon") as HTMLElement);
+  await userEvent.click(await screen.findByText("依据条款"));
+  const row = container.querySelector(".ant-table-expanded-row") as HTMLElement;
+  await userEvent.click(within(row).getByText("删除"));
+  await userEvent.click(await screen.findByRole("button", { name: /确.?定/ }));
+  await waitFor(() => expect(vi.mocked(api.deleteClause)).toHaveBeenCalledWith(1, 1));
 });
 
 test("展开行规则 Tab 展示 review_rule 结构化字段与出处", async () => {
