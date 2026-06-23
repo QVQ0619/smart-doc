@@ -46,3 +46,21 @@ def test_delete_clause_cross_doc_404(client):
     cid, _ = _clause_with_rule(client, doc_a)
     r = client.delete(f"/api/standard-docs/{doc_b}/clauses/{cid}")
     assert r.status_code == 404
+
+
+def test_delete_rule_keeps_clause(client):
+    doc_id = _doc(client)
+    cid, rid = _clause_with_rule(client, doc_id)
+    r = client.delete(f"/api/standard-docs/{doc_id}/rules/{rid}")
+    assert r.status_code == 204
+    assert client.get(f"/api/standard-docs/{doc_id}/rules").json() == []           # 规则没了
+    kept = client.get(f"/api/standard-docs/{doc_id}/clauses").json()
+    assert len(kept) == 1 and kept[0]["id"] == cid                                  # 条款保留
+
+
+def test_delete_rule_cross_doc_404(client):
+    doc_a = _doc(client)
+    doc_b = _doc(client)
+    _cid, rid = _clause_with_rule(client, doc_a)
+    r = client.delete(f"/api/standard-docs/{doc_b}/rules/{rid}")
+    assert r.status_code == 404

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import delete, select, update
 from sqlmodel import Session
@@ -55,6 +56,59 @@ def delete_rule_cascade(db: Session, rule_ids: set[int]) -> None:
         db.execute(delete(ReviewRuleClause).where(ReviewRuleClause.rule_version_id.in_(version_ids)))
         db.execute(delete(ReviewRuleVersion).where(ReviewRuleVersion.id.in_(version_ids)))
     db.execute(delete(ReviewRule).where(ReviewRule.id.in_(rule_ids)))
+
+
+def _rule_owner_doc(db: Session, rule_id: int) -> int | None:
+    """经 review_rule_clause→regulation_clause 反查规则所属文档 id;查不到返回 None。"""
+    return db.execute(
+        select(RegulationClause.standard_doc_id)
+        .join(ReviewRuleClause, ReviewRuleClause.clause_id == RegulationClause.id)
+        .join(ReviewRuleVersion, ReviewRuleClause.rule_version_id == ReviewRuleVersion.id)
+        .where(ReviewRuleVersion.rule_id == rule_id)
+    ).scalars().first()
+
+
+def update_rule(db: Session, doc_id: int, rule_id: int, name: str, logic: str | None,
+                dimension_code: str, decision_type: str, disposition: str,
+                binding_class: str) -> int:
+    """原地更新规则当前版本字段。不归属/不存在 → LookupError(404);字段非法 → ValueError(422)。"""
+    rule = db.get(ReviewRule, rule_id)
+    if rule is None or rule.current_version_id is None:
+        raise LookupError(f"rule {rule_id} not found")
+    if _rule_owner_doc(db, rule_id) != doc_id:
+        raise LookupError(f"rule {rule_id} not in doc {doc_id}")
+    ver = db.get(ReviewRuleVersion, rule.current_version_id)
+    if ver is None:
+        raise LookupError(f"rule {rule_id} version missing")
+    dim_map = dict(db.execute(select(ReviewDimension.code, ReviewDimension.id)).all())
+    if (dimension_code not in dim_map
+            or decision_type not in _DECISION
+            or disposition not in _DISPOSITION
+            or binding_class not in _BINDING
+            or not (name or "").strip()):
+        raise ValueError("规则字段非法")
+    ver.dimension_id = dim_map[dimension_code]
+    ver.name = name
+    ver.logic = logic
+    ver.decision_type = decision_type
+    ver.disposition = disposition
+    ver.binding_class = binding_class
+    db.add(ver)
+    rule.updated_at = datetime.now()
+    db.add(rule)
+    db.commit()
+    return rule.id
+
+
+def delete_rule(db: Session, doc_id: int, rule_id: int) -> None:
+    """删规则全套(version+rule_clause+rule);依据条款保留。不归属/不存在 → LookupError(404)。"""
+    rule = db.get(ReviewRule, rule_id)
+    if rule is None:
+        raise LookupError(f"rule {rule_id} not found")
+    if _rule_owner_doc(db, rule_id) != doc_id:
+        raise LookupError(f"rule {rule_id} not in doc {doc_id}")
+    delete_rule_cascade(db, {rule_id})
+    db.commit()
 
 
 def replace_rules(db: Session, doc_id: int, rules: list[RuleIn]) -> RuleWriteResult:

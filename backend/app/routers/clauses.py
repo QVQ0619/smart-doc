@@ -10,7 +10,8 @@ from ..models import (ParseSegment, RegulationClause, ReviewDimension, ReviewRul
 from ..schemas import (ClauseBatchIn, ClauseOut, ClauseUpdateIn, ClauseWriteResult,
                        ExtractRulesBatchIn, ExtractRulesResult, RuleBatchIn,
                        RuleOut, RuleUpdateIn, RuleWriteResult, SegmentOut)
-from ..structuring import extract_and_structure, replace_rules
+from ..structuring import (delete_rule, extract_and_structure, replace_rules,
+                           update_rule)
 
 router = APIRouter(tags=["clauses"])
 
@@ -137,3 +138,51 @@ def list_rules(doc_id: int, db: Session = Depends(get_session)) -> list[RuleOut]
         )
         for rr, rv, dim, rc, ps in rows
     ]
+
+
+def _rule_out(db: Session, rule_id: int) -> RuleOut:
+    row = db.execute(
+        select(ReviewRule, ReviewRuleVersion, ReviewDimension, RegulationClause, ParseSegment)
+        .join(ReviewRuleVersion, ReviewRule.current_version_id == ReviewRuleVersion.id)
+        .join(ReviewDimension, ReviewRuleVersion.dimension_id == ReviewDimension.id)
+        .join(ReviewRuleClause, ReviewRuleClause.rule_version_id == ReviewRuleVersion.id)
+        .join(RegulationClause, ReviewRuleClause.clause_id == RegulationClause.id)
+        .outerjoin(ParseSegment, RegulationClause.source_segment_id == ParseSegment.id)
+        .where(ReviewRule.id == rule_id)
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="rule not found")
+    rr, rv, dim, rc, ps = row
+    return RuleOut(
+        id=rr.id, rule_code=rr.rule_code, version=rv.version, name=rv.name, logic=rv.logic,
+        dimension_code=dim.code, dimension_name=dim.name,
+        decision_type=rv.decision_type, disposition=rv.disposition, binding_class=rv.binding_class,
+        source_clause_id=rc.id, clause_no=rc.clause_no, clause_text=rc.clause_text,
+        page_no=(ps.page_no if ps else None), locator=(ps.locator if ps else None),
+    )
+
+
+@router.patch("/standard-docs/{doc_id}/rules/{rule_id}", response_model=RuleOut,
+              dependencies=[Depends(require_api_key)])
+def patch_rule(doc_id: int, rule_id: int, body: RuleUpdateIn,
+               db: Session = Depends(get_session)) -> RuleOut:
+    _require_doc(db, doc_id)
+    try:
+        update_rule(db, doc_id, rule_id, body.name, body.logic, body.dimension_code,
+                    body.decision_type, body.disposition, body.binding_class)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="rule not found")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return _rule_out(db, rule_id)
+
+
+@router.delete("/standard-docs/{doc_id}/rules/{rule_id}", status_code=204,
+               dependencies=[Depends(require_api_key)])
+def del_rule(doc_id: int, rule_id: int, db: Session = Depends(get_session)) -> Response:
+    _require_doc(db, doc_id)
+    try:
+        delete_rule(db, doc_id, rule_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="rule not found")
+    return Response(status_code=204)
