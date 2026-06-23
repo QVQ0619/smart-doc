@@ -61,11 +61,14 @@ def list_clauses(doc_id: int, db: Session = Depends(get_session)) -> list[Clause
 
 
 def _clause_out(db: Session, clause_id: int) -> ClauseOut:
-    rc, ps = db.execute(
+    row = db.execute(
         select(RegulationClause, ParseSegment)
         .outerjoin(ParseSegment, RegulationClause.source_segment_id == ParseSegment.id)
         .where(RegulationClause.id == clause_id)
     ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="clause not found")
+    rc, ps = row
     return ClauseOut(
         id=rc.id, clause_no=rc.clause_no, clause_text=rc.clause_text,
         source_segment_id=rc.source_segment_id,
