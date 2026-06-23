@@ -1,0 +1,8 @@
+id: rule_extractor
+name: 规则抽取师
+version: 0.1.0
+description: 从已识别的规则文档抽取审查条款(带出处)入库
+initial_mode: executing
+initial_message: 告诉我抽取哪个文档的审查规则(书名号标题或 SD- 开头的 doc_code)。
+local_skills:
+  - extract-review-rules

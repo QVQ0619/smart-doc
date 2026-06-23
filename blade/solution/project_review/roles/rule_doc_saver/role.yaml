@@ -1,0 +1,8 @@
+id: rule_doc_saver
+name: 规则入库员
+version: 0.1.0
+description: 接收上传的规则文件，入规则库并自动识别结构
+initial_mode: executing
+initial_message: 把规则文件发我，我入库并识别结构。
+local_skills:
+  - save-rule-doc                 # → skills/save-rule-doc/SKILL.md

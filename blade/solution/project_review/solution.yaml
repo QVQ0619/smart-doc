@@ -1,0 +1,15 @@
+id: project_review
+name: 立项审查工作台
+manifest_version: 3
+version: 0.1.0
+description: 规则文件上传识别 → 审查条款抽取 → 结构化审查规则 的立项审查工作台
+layout_type: blade-coa            # 工作台双栏：左对话 右预览(嵌规则库)
+initial_mode: executing           # 面向终端用户直接干活
+skill_tools_enabled: true
+preview:                          # 预览面板默认内容；url 支持 ${ENV_VAR} 平台展开
+  url: ${SMART_DOC_WEB}/standard-docs   # 指向 React 规则库；用户浏览器加载，localhost 可达即可
+  title: 规则库
+roles:                            # 每个 id 须有 roles/<id>/role.yaml
+  - rule_doc_saver
+  - rule_extractor
+  - rule_structurer

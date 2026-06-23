@@ -1,0 +1,8 @@
+id: rule_structurer
+name: 规则结构化师
+version: 0.1.0
+description: 把已抽取的条款 1:1 升格为结构化审查规则(维度/判定/处置/绑定)
+initial_mode: executing
+initial_message: 告诉我把哪个文档的条款结构化为审查规则。
+local_skills:
+  - structure-review-rules
