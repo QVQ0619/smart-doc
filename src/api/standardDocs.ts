@@ -77,3 +77,25 @@ export interface Clause {
 export function listClauses(docId: number): Promise<Clause[]> {
   return fetch(`/api/standard-docs/${docId}/clauses`).then((r) => handle<Clause[]>(r));
 }
+
+export interface Rule {
+  id: number;
+  rule_code: string;
+  version: string;
+  name: string;
+  logic: string | null;
+  dimension_code: string;
+  dimension_name: string;
+  decision_type: string;
+  disposition: string;
+  binding_class: string;
+  source_clause_id: number | null;
+  clause_no: string | null;
+  clause_text: string | null;
+  page_no: number | null;
+  locator: Record<string, unknown> | null;
+}
+
+export function listRules(docId: number): Promise<Rule[]> {
+  return fetch(`/api/standard-docs/${docId}/rules`).then((r) => handle<Rule[]>(r));
+}

@@ -13,6 +13,7 @@ vi.mock("../api/standardDocs", async () => {
     deleteStandardDoc: vi.fn(),
     recognizeStandardDoc: vi.fn(),
     listClauses: vi.fn(),
+    listRules: vi.fn(),
   };
 });
 
@@ -41,6 +42,7 @@ beforeEach(() => {
   vi.mocked(api.listClauses).mockResolvedValue([
     { id: 1, clause_no: "第一条", clause_text: "申请人应当具有高级职称。", source_segment_id: 5, page_no: 2, locator: { page: 2, block_index: 1 } },
   ] as never);
+  vi.mocked(api.listRules).mockResolvedValue([] as never);
 });
 
 test("渲染列表中的规则文件标题", async () => {
@@ -82,6 +84,8 @@ test("展开文档行显示抽取的条款与出处", async () => {
   await screen.findByText("政策A");
   const expandBtn = container.querySelector(".ant-table-row-expand-icon") as HTMLElement;
   await userEvent.click(expandBtn);
+  // 展开后默认显示「审查规则」Tab，切换到「依据条款」Tab
+  await userEvent.click(await screen.findByText("依据条款"));
   expect(await screen.findByText("第一条")).toBeInTheDocument();
   expect(await screen.findByText("申请人应当具有高级职称。")).toBeInTheDocument();
   expect(await screen.findByText(/第2页/)).toBeInTheDocument();
@@ -101,4 +105,33 @@ test("规则库页挂载时每 10 秒轮询刷新列表", async () => {
   } finally {
     vi.useRealTimers();
   }
+});
+
+test("展开行规则 Tab 展示 review_rule 结构化字段与出处", async () => {
+  vi.mocked(api.listStandardDocs).mockResolvedValue([
+    {
+      id: 3, doc_code: "SD-x", title: "申请规定", file_name: "a.pdf",
+      size_bytes: 1, mime_type: "application/pdf", created_at: null,
+      recognition_status: "done",
+    },
+  ] as never);
+  vi.mocked(api.listClauses).mockResolvedValue([] as never);
+  vi.mocked(api.listRules).mockResolvedValue([
+    {
+      id: 1, rule_code: "RULE-abc", version: "V1.0", name: "同年限申请1项", logic: null,
+      dimension_code: "compliance", dimension_name: "合规性",
+      decision_type: "hard", disposition: "reject", binding_class: "common",
+      source_clause_id: 9, clause_no: "二(一)1", clause_text: "同年只能申请1项",
+      page_no: 5, locator: { page: 5, block_index: 0 },
+    },
+  ] as never);
+  const { container } = renderLib();
+  await screen.findByText("申请规定");
+  // 展开该文档行
+  const expandBtn = container.querySelector(".ant-table-row-expand-icon") as HTMLElement;
+  await userEvent.click(expandBtn);
+  await waitFor(() => expect(vi.mocked(api.listRules)).toHaveBeenCalledWith(3));
+  expect(await screen.findByText("同年限申请1项")).toBeInTheDocument();
+  expect(screen.getByText("合规性")).toBeInTheDocument();
+  expect(screen.getByText("第5页第1段")).toBeInTheDocument();
 });
