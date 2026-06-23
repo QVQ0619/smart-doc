@@ -39,6 +39,12 @@ async function handle<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
+// 写/变更请求带上共享密钥（与后端 X-API-Key 鉴权对应）；未配置则不带，行为不变。
+function authHeaders(): Record<string, string> {
+  const k = import.meta.env.VITE_SMART_DOC_API_KEY?.trim();
+  return k ? { "X-API-Key": k } : {};
+}
+
 export function listStandardDocs(): Promise<StandardDoc[]> {
   return fetch("/api/standard-docs").then((r) => handle<StandardDoc[]>(r));
 }
@@ -46,13 +52,13 @@ export function listStandardDocs(): Promise<StandardDoc[]> {
 export function uploadStandardDocs(files: File[]): Promise<UploadResult> {
   const form = new FormData();
   for (const f of files) form.append("files", f);
-  return fetch("/api/standard-docs", { method: "POST", body: form }).then((r) =>
+  return fetch("/api/standard-docs", { method: "POST", body: form, headers: authHeaders() }).then((r) =>
     handle<UploadResult>(r),
   );
 }
 
 export function deleteStandardDoc(id: number): Promise<void> {
-  return fetch(`/api/standard-docs/${id}`, { method: "DELETE" }).then((r) => handle<void>(r));
+  return fetch(`/api/standard-docs/${id}`, { method: "DELETE", headers: authHeaders() }).then((r) => handle<void>(r));
 }
 
 export function downloadStandardDocUrl(id: number): string {
@@ -60,7 +66,7 @@ export function downloadStandardDocUrl(id: number): string {
 }
 
 export function recognizeStandardDoc(id: number): Promise<RecognizeResult> {
-  return fetch(`/api/standard-docs/${id}/recognize`, { method: "POST" }).then((r) =>
+  return fetch(`/api/standard-docs/${id}/recognize`, { method: "POST", headers: authHeaders() }).then((r) =>
     handle<RecognizeResult>(r),
   );
 }

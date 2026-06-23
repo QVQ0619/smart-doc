@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # 仅本机访问可设 SMART_HOST=127.0.0.1。
     host: str = "0.0.0.0"
     port: int = 8000
+    # 写/变更端点的共享密钥（环境变量 SMART_API_KEY）；为空则不鉴权
+    # （本地 dev/向后兼容），对外可达部署应设置以防匿名写/删业务库。
+    api_key: str = ""
 
     @property
     def max_upload_bytes(self) -> int:

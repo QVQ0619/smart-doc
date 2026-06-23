@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlmodel import Session
 
+from ..auth import require_api_key
 from ..config import get_max_upload_bytes
 from ..db import get_session
 from ..models import FileObject, StandardDoc
@@ -31,7 +32,7 @@ def _to_out(sd: StandardDoc, fo: FileObject, *, segment_count=None, page_count=N
     )
 
 
-@router.post("/standard-docs", response_model=UploadResult)
+@router.post("/standard-docs", response_model=UploadResult, dependencies=[Depends(require_api_key)])
 def upload_standard_docs(
     files: list[UploadFile] = File(...),
     db: Session = Depends(get_session),
@@ -109,7 +110,7 @@ def list_standard_docs(db: Session = Depends(get_session)) -> list[StandardDocOu
     return [_to_out(sd, fo) for sd, fo in rows]
 
 
-@router.post("/standard-docs/{doc_id}/recognize", response_model=RecognizeResult)
+@router.post("/standard-docs/{doc_id}/recognize", response_model=RecognizeResult, dependencies=[Depends(require_api_key)])
 def recognize_endpoint(
     doc_id: int,
     db: Session = Depends(get_session),
@@ -139,7 +140,7 @@ def download_standard_doc(
     return FileResponse(path, filename=fo.file_name, media_type=fo.mime_type or "application/octet-stream")
 
 
-@router.delete("/standard-docs/{doc_id}", status_code=204)
+@router.delete("/standard-docs/{doc_id}", status_code=204, dependencies=[Depends(require_api_key)])
 def delete_standard_doc(doc_id: int, db: Session = Depends(get_session)):
     sd = db.get(StandardDoc, doc_id)
     if sd is None or not sd.is_active:

@@ -32,8 +32,11 @@ def main(argv: list[str]) -> int:
         return 2
     timeout = int(os.environ.get("SMART_DOC_TIMEOUT", "120"))
     url = api_base.rstrip("/") + f"/api/standard-docs/{doc_id}/rules"
-    req = urllib.request.Request(url, data=path.read_bytes(), method="POST",
-                                 headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    api_key = os.environ.get("SMART_DOC_API_KEY")
+    if api_key:
+        headers["X-API-Key"] = api_key
+    req = urllib.request.Request(url, data=path.read_bytes(), method="POST", headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             result = json.loads(resp.read().decode("utf-8"))

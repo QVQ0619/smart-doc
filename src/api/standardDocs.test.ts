@@ -36,7 +36,10 @@ test("uploadStandardDocs 以 FormData 提交多文件", async () => {
 test("deleteStandardDoc 发 DELETE", async () => {
   fetchMock.mockResolvedValue({ ok: true, status: 204 });
   await deleteStandardDoc(7);
-  expect(fetchMock).toHaveBeenCalledWith("/api/standard-docs/7", { method: "DELETE" });
+  const [url, init] = fetchMock.mock.calls[0];
+  expect(url).toBe("/api/standard-docs/7");
+  expect(init.method).toBe("DELETE");
+  expect(init.headers).not.toHaveProperty("X-API-Key"); // 未配 key 时不带
 });
 
 test("downloadStandardDocUrl 返回地址", () => {
@@ -54,7 +57,10 @@ test("recognizeStandardDoc 发 POST 到识别接口", async () => {
     json: async () => ({ doc_id: 3, doc_code: "SD-x", recognition_status: "done", segment_count: 7, page_count: 2, error: null }),
   });
   const res = await recognizeStandardDoc(3);
-  expect(fetchMock).toHaveBeenCalledWith("/api/standard-docs/3/recognize", { method: "POST" });
+  const [url, init] = fetchMock.mock.calls[0];
+  expect(url).toBe("/api/standard-docs/3/recognize");
+  expect(init.method).toBe("POST");
+  expect(init.headers).not.toHaveProperty("X-API-Key"); // 未配 key 时不带
   expect(res.segment_count).toBe(7);
 });
 

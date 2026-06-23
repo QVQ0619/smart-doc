@@ -45,7 +45,11 @@ def upload(api_base: str, paths: list[str], timeout: int) -> dict:
     非2xx 抛 urllib.error.HTTPError; 连接失败抛 urllib.error.URLError."""
     body, ctype = build_multipart(paths)
     url = api_base.rstrip("/") + "/api/standard-docs"
-    req = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": ctype})
+    headers = {"Content-Type": ctype}
+    api_key = os.environ.get("SMART_DOC_API_KEY")
+    if api_key:
+        headers["X-API-Key"] = api_key
+    req = urllib.request.Request(url, data=body, method="POST", headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 

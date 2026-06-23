@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlmodel import Session
 
+from ..auth import require_api_key
 from ..db import get_session
 from ..extraction import replace_clauses
 from ..models import (ParseSegment, RegulationClause, ReviewDimension, ReviewRule,
@@ -32,7 +33,7 @@ def list_segments(doc_id: int, db: Session = Depends(get_session)) -> list[Segme
     ]
 
 
-@router.post("/standard-docs/{doc_id}/clauses", response_model=ClauseWriteResult)
+@router.post("/standard-docs/{doc_id}/clauses", response_model=ClauseWriteResult, dependencies=[Depends(require_api_key)])
 def post_clauses(doc_id: int, body: ClauseBatchIn, db: Session = Depends(get_session)) -> ClauseWriteResult:
     _require_doc(db, doc_id)
     return replace_clauses(db, doc_id, body.clauses)
@@ -58,7 +59,7 @@ def list_clauses(doc_id: int, db: Session = Depends(get_session)) -> list[Clause
     ]
 
 
-@router.post("/standard-docs/{doc_id}/rules", response_model=RuleWriteResult)
+@router.post("/standard-docs/{doc_id}/rules", response_model=RuleWriteResult, dependencies=[Depends(require_api_key)])
 def post_rules(doc_id: int, body: RuleBatchIn, db: Session = Depends(get_session)) -> RuleWriteResult:
     _require_doc(db, doc_id)
     return replace_rules(db, doc_id, body.rules)
