@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import text as sqltext
 from sqlmodel import Session
 
@@ -61,6 +62,20 @@ def test_replace_clauses_invalid_or_missing_segment_nulled_and_counted(_test_db)
         nulls = s.execute(sqltext(
             "SELECT COUNT(*) FROM regulation_clause WHERE standard_doc_id=:d AND source_segment_id IS NULL"), {"d": doc_id}).scalar_one()
     assert nulls == 2
+
+
+def test_replace_clauses_raises_when_doc_missing(_test_db):
+    # doc 不存在时应 fail-fast（raise），不静默写入空 doc_code，也不执行 delete
+    doc_id, seg1, seg2 = _seed()
+    missing_id = doc_id + 999999
+    with Session(engine) as db:
+        with pytest.raises(ValueError):
+            replace_clauses(db, missing_id, [
+                ClauseIn(clause_no="#1", clause_text="x", source_segment_id=None),
+            ])
+    # 既有 doc 的条款不受影响（未被误删/误写）
+    assert _count(missing_id) == 0
+    assert _count(doc_id) == 0
 
 
 def test_replace_clauses_idempotent_replace(_test_db):
