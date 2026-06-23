@@ -63,8 +63,10 @@ def test_standarddoc_failure_rolls_back_fileobject(client, storage_dir, monkeypa
         raise RuntimeError("forced standard_doc failure")
     monkeypatch.setattr(standard_docs, "StandardDoc", boom)
 
+    # force=true 跳过同名检测(检测会用到被 mock 的 StandardDoc)，直达构造路径——
+    # 本测试验证的是"StandardDoc 构造失败时回滚 file_object + 删盘"，与检测无关。
     r = client.post(
-        "/api/standard-docs",
+        "/api/standard-docs?force=true",
         files=[("files", ("x.txt", b"data", "text/plain"))],
     )
     assert r.status_code == 200

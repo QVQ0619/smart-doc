@@ -15,6 +15,7 @@ class StandardDocOut(BaseModel):
     recognition_status: str
     segment_count: Optional[int] = None
     page_count: Optional[int] = None
+    status: Optional[str] = None          # 上传场景: created | reused
 
 
 class FailedItem(BaseModel):
@@ -22,9 +23,16 @@ class FailedItem(BaseModel):
     reason: str
 
 
+class ConflictItem(BaseModel):
+    name: str                              # 本次上传的文件名
+    existing_doc_code: str                 # 库中已有同名文档的 doc_code
+    existing_title: str
+
+
 class UploadResult(BaseModel):
     uploaded: list[StandardDocOut]
     failed: list[FailedItem]
+    conflicts: list[ConflictItem] = []
 
 
 class RecognizeResult(BaseModel):

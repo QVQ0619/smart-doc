@@ -44,8 +44,8 @@ test("配了 env → 推送两个 skill(save-rule-doc + 一步 extract-rules)，
   expect(sid1).toBe("s-1");
   expect(p1.name).toBe("local/extract-rules");
   expect(p1.files.map((f) => f.path)).toEqual([
-    "SKILL.md", "scripts/smart_doc_segments.py", "scripts/smart_doc_extract_rules.py",
-    "scripts/api_base.txt", "scripts/api_key.txt",
+    "SKILL.md", "scripts/smart_doc_add.py", "scripts/smart_doc_segments.py",
+    "scripts/smart_doc_extract_rules.py", "scripts/api_base.txt", "scripts/api_key.txt",
   ]);
   expect(p1.files.find((f) => f.path === "scripts/api_base.txt")!.content).toBe("https://t.example.com");
   expect(p1.files.find((f) => f.path === "scripts/api_key.txt")!.content).toBe("k-secret");

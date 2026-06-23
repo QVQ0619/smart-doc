@@ -55,6 +55,7 @@ export async function pushRuleDocSkill(sessionId: string): Promise<void> {
   ]);
   await pushOne(sessionId, EXTRACT_RULES_SKILL_NAME, [
     { path: "SKILL.md", content: EXTRACT_RULES_SKILL_MD },
+    { path: "scripts/smart_doc_add.py", content: SHIM_PY },
     { path: "scripts/smart_doc_segments.py", content: SEGMENTS_PY },
     { path: "scripts/smart_doc_extract_rules.py", content: EXTRACT_RULES_PY },
     { path: "scripts/api_base.txt", content: apiBase ?? "" },

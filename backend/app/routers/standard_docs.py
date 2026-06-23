@@ -11,13 +11,13 @@ from ..config import get_max_upload_bytes
 from ..db import get_session
 from ..models import FileObject, StandardDoc
 from ..recognition import recognize_standard_doc
-from ..schemas import FailedItem, RecognizeResult, StandardDocOut, UploadResult
+from ..schemas import ConflictItem, FailedItem, RecognizeResult, StandardDocOut, UploadResult
 from ..storage import FileStorage, FileTooLargeError, get_storage
 
 router = APIRouter(tags=["standard_docs"])
 
 
-def _to_out(sd: StandardDoc, fo: FileObject, *, segment_count=None, page_count=None) -> StandardDocOut:
+def _to_out(sd: StandardDoc, fo: FileObject, *, segment_count=None, page_count=None, status=None) -> StandardDocOut:
     return StandardDocOut(
         id=sd.id,
         doc_code=sd.doc_code,
@@ -29,18 +29,22 @@ def _to_out(sd: StandardDoc, fo: FileObject, *, segment_count=None, page_count=N
         recognition_status=sd.recognition_status,
         segment_count=segment_count,
         page_count=page_count,
+        status=status,
     )
 
 
 @router.post("/standard-docs", response_model=UploadResult, dependencies=[Depends(require_api_key)])
 def upload_standard_docs(
     files: list[UploadFile] = File(...),
+    force: bool = False,
+    replace: bool = False,
     db: Session = Depends(get_session),
     storage: FileStorage = Depends(get_storage),
     max_bytes: int = Depends(get_max_upload_bytes),
 ) -> UploadResult:
     uploaded: list[StandardDocOut] = []
     failed: list[FailedItem] = []
+    conflicts: list[ConflictItem] = []
 
     for up in files:
         name = up.filename or "unnamed"
@@ -52,6 +56,52 @@ def upload_standard_docs(
         except Exception as e:  # noqa: BLE001
             failed.append(FailedItem(name=name, reason=f"落盘失败: {e}"))
             continue
+
+        title = name.rsplit(".", 1)[0] if "." in name else name
+
+        if not force:
+            # 内容完全相同(同 content_hash)的在库文档 → 复用，不重复入库
+            dup = db.execute(
+                select(StandardDoc, FileObject)
+                .join(FileObject, StandardDoc.file_id == FileObject.id)
+                .where(StandardDoc.is_active == True, FileObject.deleted_at == None,  # noqa: E712
+                       FileObject.content_hash == blob.sha256)
+            ).first()
+            if dup is not None:
+                storage.delete(blob.object_key)        # 删掉刚落盘的重复副本
+                sd, fo = dup
+                uploaded.append(_to_out(sd, fo, status="reused"))
+                continue
+            # 同名(title 相同)但内容不同 = 更新版 → 冲突，交调用方决定(更新/另存)
+            same_title = db.execute(
+                select(StandardDoc, FileObject)
+                .join(FileObject, StandardDoc.file_id == FileObject.id)
+                .where(StandardDoc.is_active == True, FileObject.deleted_at == None,  # noqa: E712
+                       StandardDoc.title == title)
+            ).first()
+            if same_title is not None:
+                storage.delete(blob.object_key)
+                esd, _efo = same_title
+                conflicts.append(ConflictItem(
+                    name=name, existing_doc_code=esd.doc_code, existing_title=esd.title,
+                ))
+                continue
+
+        if force and replace:
+            # 更新语义：软删同名的 active 文档(旧版隐藏、其条款/规则随之不再显示)，再新建
+            olds = db.execute(
+                select(StandardDoc, FileObject)
+                .join(FileObject, StandardDoc.file_id == FileObject.id)
+                .where(StandardDoc.is_active == True, FileObject.deleted_at == None,  # noqa: E712
+                       StandardDoc.title == title)
+            ).all()
+            for osd, ofo in olds:
+                osd.is_active = False
+                ofo.deleted_at = datetime.now()
+                db.add(osd)
+                db.add(ofo)
+            if olds:
+                db.commit()
 
         try:
             fo = FileObject(
@@ -66,7 +116,6 @@ def upload_standard_docs(
             db.add(fo)
             db.flush()          # assigns fo.id WITHOUT committing
 
-            title = name.rsplit(".", 1)[0] if "." in name else name
             sd = StandardDoc(
                 doc_code=f"SD-{uuid.uuid4().hex[:12]}",
                 title=title,
@@ -94,9 +143,10 @@ def upload_standard_docs(
             sd, fo,
             segment_count=rec.segment_count if rec else None,
             page_count=rec.page_count if rec else None,
+            status="created",
         ))
 
-    return UploadResult(uploaded=uploaded, failed=failed)
+    return UploadResult(uploaded=uploaded, failed=failed, conflicts=conflicts)
 
 
 @router.get("/standard-docs", response_model=list[StandardDocOut])
