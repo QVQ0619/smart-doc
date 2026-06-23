@@ -66,3 +66,40 @@ class ClauseOut(BaseModel):
     source_segment_id: Optional[int]
     page_no: Optional[int]
     locator: Optional[Any]
+
+
+class RuleIn(BaseModel):
+    source_clause_id: int
+    dimension_code: str
+    name: str
+    logic: Optional[str] = None
+    decision_type: str
+    disposition: str
+    binding_class: str
+
+
+class RuleBatchIn(BaseModel):
+    rules: list[RuleIn]
+
+
+class RuleWriteResult(BaseModel):
+    inserted: int
+    skipped: int
+
+
+class RuleOut(BaseModel):
+    id: int
+    rule_code: str
+    version: str
+    name: str
+    logic: Optional[str]
+    dimension_code: str
+    dimension_name: str
+    decision_type: str
+    disposition: str
+    binding_class: str
+    source_clause_id: Optional[int]
+    clause_no: Optional[str]
+    clause_text: Optional[str]
+    page_no: Optional[int]
+    locator: Optional[Any]
