@@ -60,6 +60,32 @@ def test_extract_rules_idempotent_replace(client):
     assert len(clauses) == 1 and clauses[0]["clause_no"] == "第二条"
 
 
+def test_extract_rules_backfills_provenance_by_text(client):
+    """agent 没填 source_segment_id 时，后端用 clause_text 在段落原文反查兜底出处。"""
+    from sqlmodel import Session
+    from app.db import engine
+    from app.models import ParseSegment
+    doc_id = _upload(client)
+    with Session(engine) as s:
+        seg = ParseSegment(
+            standard_doc_id=doc_id, page_no=2, locator={"page": 2, "block_index": 1},
+            segment_type="text", content_text="申请人应当具有高级专业技术职称，并承担过国家级课题。",
+        )
+        s.add(seg)
+        s.commit()
+        s.refresh(seg)
+        seg_id = seg.id
+    item = _item("第一条", "职称")
+    item["source_segment_id"] = None          # agent 没填
+    item["clause_text"] = "申请人应当具有高级专业技术职称"  # 但是段落原文的子串
+    r = client.post(f"/api/standard-docs/{doc_id}/extract-rules", json={"items": [item]})
+    assert r.status_code == 200
+    assert r.json()["missing_provenance"] == 0  # 兜底补上，不算缺失
+    clauses = client.get(f"/api/standard-docs/{doc_id}/clauses").json()
+    assert clauses[0]["source_segment_id"] == seg_id
+    assert clauses[0]["page_no"] == 2
+
+
 def test_extract_rules_protected_by_key(client, monkeypatch):
     import app.config as config
     monkeypatch.setattr(config.settings, "api_key", "secret")

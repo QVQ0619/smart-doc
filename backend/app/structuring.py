@@ -84,6 +84,19 @@ def replace_rules(db: Session, doc_id: int, rules: list[RuleIn]) -> RuleWriteRes
     return RuleWriteResult(inserted=inserted, skipped=skipped)
 
 
+def _resolve_seg_id(source_segment_id, clause_text, valid_seg_ids, seg_texts):
+    """出处解析：agent 填的有效 source_segment_id 优先；缺失/无效时，用 clause_text
+    在段落原文(content_text)里反查(包含匹配)兜底，避免出处丢失。都不中返回 None。"""
+    if source_segment_id is not None and source_segment_id in valid_seg_ids:
+        return source_segment_id
+    ct = (clause_text or "").strip()
+    if len(ct) >= 6:  # 太短易误命中，跳过
+        for sid, txt in seg_texts:
+            if ct in txt:
+                return sid
+    return None
+
+
 def extract_and_structure(db: Session, doc_id: int, items: list[ExtractRuleItemIn]) -> ExtractRulesResult:
     """一步抽取：原子地把每个 item(条款字段+规则字段)入 regulation_clause + review_rule(1:1)。
     按文档幂等替换(先清旧 rule cascade、再清旧 clause)。规则字段非法/空名/空条号 → 跳过整条。
@@ -92,9 +105,11 @@ def extract_and_structure(db: Session, doc_id: int, items: list[ExtractRuleItemI
     if sd is None:
         raise ValueError(f"standard_doc {doc_id} 不存在")
     doc_code = sd.doc_code
-    valid_seg_ids = set(
-        db.execute(select(ParseSegment.id).where(ParseSegment.standard_doc_id == doc_id)).scalars().all()
-    )
+    seg_rows = db.execute(
+        select(ParseSegment.id, ParseSegment.content_text).where(ParseSegment.standard_doc_id == doc_id)
+    ).all()
+    valid_seg_ids = {sid for sid, _ in seg_rows}
+    seg_texts = [(sid, ct or "") for sid, ct in seg_rows]
     dim_map = dict(db.execute(select(ReviewDimension.code, ReviewDimension.id)).all())
 
     # 清旧：先 rule(cascade 复用)，再 clause
@@ -114,9 +129,8 @@ def extract_and_structure(db: Session, doc_id: int, items: list[ExtractRuleItemI
                 or not (it.clause_no or "").strip()):
             skipped += 1
             continue
-        seg_id = it.source_segment_id
-        if seg_id is None or seg_id not in valid_seg_ids:
-            seg_id = None
+        seg_id = _resolve_seg_id(it.source_segment_id, it.clause_text, valid_seg_ids, seg_texts)
+        if seg_id is None:
             missing_provenance += 1
         clause = RegulationClause(
             standard_doc_id=doc_id, doc_code=doc_code,
