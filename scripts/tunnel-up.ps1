@@ -50,9 +50,16 @@ foreach ($attempt in 1, 2) {
 if (-not $ok) { Write-Error "tunnel failed after 2 attempts (backend up? port 7844 outbound?). Rerun."; exit 1 }
 
 Write-Output "Passthrough OK (200). Writing .env VITE_SMART_DOC_API (key untouched)"
-$content = Get-Content $envPath -Raw
-$content = $content -replace "(?m)^VITE_SMART_DOC_API=.*$", "VITE_SMART_DOC_API=$domain"
-[System.IO.File]::WriteAllText($envPath, $content, (New-Object System.Text.UTF8Encoding $false))
+# Line-by-line (NOT -raw regex): a -replace on raw content can merge the value
+# into a preceding comment line. Match only at line start; append if absent.
+$lines = Get-Content $envPath
+$found = $false
+$out = foreach ($l in $lines) {
+  if ($l -match '^VITE_SMART_DOC_API=') { $found = $true; "VITE_SMART_DOC_API=$domain" }
+  else { $l }
+}
+if (-not $found) { $out = @($out) + "VITE_SMART_DOC_API=$domain" }
+[System.IO.File]::WriteAllText($envPath, (($out -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding $false))
 
 Write-Output ""
 Write-Output "OK: $domain  ready and written to .env."
