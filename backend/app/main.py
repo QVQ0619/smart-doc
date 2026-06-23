@@ -1,12 +1,23 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import Session
 
 from .config import settings
+from .db import engine
+from .dimensions import ensure_dimensions
 from .routers import standard_docs, clauses
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="立项审查文件存储后端")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        with Session(engine) as db:
+            ensure_dimensions(db)
+        yield
+
+    app = FastAPI(title="立项审查文件存储后端", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
