@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StandardDocLibrary from "./StandardDocLibrary";
@@ -9,7 +9,6 @@ vi.mock("../api/standardDocs", async () => {
   return {
     ...actual,
     listStandardDocs: vi.fn(),
-    uploadStandardDocs: vi.fn(),
     deleteStandardDoc: vi.fn(),
     recognizeStandardDoc: vi.fn(),
     listClauses: vi.fn(),
@@ -34,7 +33,6 @@ const sample = {
 
 beforeEach(() => {
   vi.mocked(api.listStandardDocs).mockResolvedValue([sample] as never);
-  vi.mocked(api.uploadStandardDocs).mockResolvedValue({ uploaded: [sample], failed: [] } as never);
   vi.mocked(api.deleteStandardDoc).mockResolvedValue();
   vi.mocked(api.recognizeStandardDoc).mockResolvedValue({
     doc_id: 1, doc_code: "SD-abc", recognition_status: "done", segment_count: 9, page_count: 2, error: null,
@@ -50,13 +48,10 @@ test("渲染列表中的规则文件标题", async () => {
   expect(await screen.findByText("政策A")).toBeInTheDocument();
 });
 
-test("选择文件触发上传", async () => {
-  const { container } = renderLib();
+test("规则库页不再提供上传按钮（上传走聊天）", async () => {
+  renderLib();
   await screen.findByText("政策A");
-  const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-  const file = new File(["data"], "new.txt", { type: "text/plain" });
-  fireEvent.change(input, { target: { files: [file] } });
-  await waitFor(() => expect(vi.mocked(api.uploadStandardDocs)).toHaveBeenCalledWith([file]));
+  expect(screen.queryByRole("button", { name: "上传规则文件" })).not.toBeInTheDocument();
 });
 
 test("删除经确认调用 deleteStandardDoc", async () => {
