@@ -5,6 +5,7 @@ from sqlmodel import Session
 
 from .models import ParseSegment, RegulationClause, StandardDoc
 from .schemas import ClauseIn, ClauseWriteResult
+from .structuring import delete_rules_for_doc
 
 
 def replace_clauses(db: Session, doc_id: int, clauses: list[ClauseIn]) -> ClauseWriteResult:
@@ -17,6 +18,8 @@ def replace_clauses(db: Session, doc_id: int, clauses: list[ClauseIn]) -> Clause
     valid_ids = set(
         db.execute(select(ParseSegment.id).where(ParseSegment.standard_doc_id == doc_id)).scalars().all()
     )
+    # 先级联清掉基于这些条款的 review_rule(否则 fk_rvc_clause 阻塞下方删除)，再删旧条款
+    delete_rules_for_doc(db, doc_id)
     db.execute(delete(RegulationClause).where(RegulationClause.standard_doc_id == doc_id))
     inserted = 0
     missing = 0

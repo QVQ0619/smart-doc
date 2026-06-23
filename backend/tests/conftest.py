@@ -6,6 +6,8 @@ from pathlib import Path
 # 测试连 smart_test，绝不连 smart 生产库；env 必须在导入 app 之前设置
 os.environ["SMART_DATABASE_URL"] = "mysql+pymysql://root:root@localhost:3306/smart_test"
 os.environ.setdefault("SMART_STORAGE_DIR", "./_unused_test_storage")
+# 测试默认不鉴权（覆盖 backend/.env 里可能存在的 SMART_API_KEY）；test_auth 自行 monkeypatch 开启
+os.environ["SMART_API_KEY"] = ""
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

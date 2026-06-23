@@ -14,17 +14,9 @@ _DISPOSITION = {"reject", "fix", "review"}
 _BINDING = {"common", "parameterized", "specific"}
 
 
-def replace_rules(db: Session, doc_id: int, rules: list[RuleIn]) -> RuleWriteResult:
-    """按文档幂等替换该文档的 review_rule(1:1 升格)。
-    经 review_rule_clause→regulation_clause 反查该文档既有 rule，删后重建。
-    非法 source_clause_id/维度/枚举/空名 → 跳过计 skipped。单次 commit。"""
-    valid_clause_ids = set(
-        db.execute(
-            select(RegulationClause.id).where(RegulationClause.standard_doc_id == doc_id)
-        ).scalars().all()
-    )
-
-    # —— 删旧：反查该文档关联的 rule_version → rule ——
+def delete_rules_for_doc(db: Session, doc_id: int) -> None:
+    """删除该文档(经 review_rule_clause→regulation_clause 反查)关联的 review_rule 全套。
+    循环 FK 序：断 current_version_id → 删 rule_clause → version → rule。不 commit，由调用方提交。"""
     old_version_ids = set(
         db.execute(
             select(ReviewRuleClause.rule_version_id)
@@ -45,6 +37,20 @@ def replace_rules(db: Session, doc_id: int, rules: list[RuleIn]) -> RuleWriteRes
         db.execute(delete(ReviewRuleVersion).where(ReviewRuleVersion.id.in_(old_version_ids)))
     if old_rule_ids:
         db.execute(delete(ReviewRule).where(ReviewRule.id.in_(old_rule_ids)))
+
+
+def replace_rules(db: Session, doc_id: int, rules: list[RuleIn]) -> RuleWriteResult:
+    """按文档幂等替换该文档的 review_rule(1:1 升格)。
+    经 review_rule_clause→regulation_clause 反查该文档既有 rule，删后重建。
+    非法 source_clause_id/维度/枚举/空名 → 跳过计 skipped。单次 commit。"""
+    valid_clause_ids = set(
+        db.execute(
+            select(RegulationClause.id).where(RegulationClause.standard_doc_id == doc_id)
+        ).scalars().all()
+    )
+
+    # —— 删旧：清掉该文档既有的 review_rule 全套(复用 delete_rules_for_doc) ——
+    delete_rules_for_doc(db, doc_id)
 
     dim_map = dict(db.execute(select(ReviewDimension.code, ReviewDimension.id)).all())
 
