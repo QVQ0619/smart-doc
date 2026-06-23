@@ -61,8 +61,12 @@ def storage_dir(tmp_path):
 def client(_test_db, storage_dir):
     from app.storage import FileStorage, get_storage
 
-    # 清理本期涉及的表（regulation_clause 是 standard_doc 与 parse_segment 的子表，先删）
+    # 清理本期涉及的表（外键约束顺序：先断循环引用，再逐层删子表）
     with Session(engine) as s:
+        s.execute(text("DELETE FROM review_rule_clause"))
+        s.execute(text("UPDATE review_rule SET current_version_id=NULL"))
+        s.execute(text("DELETE FROM review_rule_version"))
+        s.execute(text("DELETE FROM review_rule"))
         s.execute(text("DELETE FROM regulation_clause"))
         s.execute(text("DELETE FROM parse_segment"))
         s.execute(text("DELETE FROM standard_doc"))
