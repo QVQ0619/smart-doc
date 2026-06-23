@@ -26,11 +26,11 @@ beforeEach(() => {
   toast.warning.mockReset();
 });
 
-test("配了 VITE_SMART_DOC_API → 推送两个 skill(save-rule-doc + extract-review-rules)", async () => {
+test("配了 VITE_SMART_DOC_API → 推送三个 skill(save-rule-doc + extract-review-rules + structure-review-rules)", async () => {
   vi.stubEnv("VITE_SMART_DOC_API", "https://t.example.com");
   await pushRuleDocSkill("s-1");
 
-  expect(uploadSessionSkill).toHaveBeenCalledTimes(2);
+  expect(uploadSessionSkill).toHaveBeenCalledTimes(3);
   const [sid0, p0] = uploadSessionSkill.mock.calls[0] as [string, { name: string; files: FileEntry[] }];
   expect(sid0).toBe("s-1");
   expect(p0.name).toBe("local/save-rule-doc");
@@ -44,13 +44,22 @@ test("配了 VITE_SMART_DOC_API → 推送两个 skill(save-rule-doc + extract-r
   ]);
   const api1 = p1.files.find((f) => f.path === "scripts/api_base.txt")!;
   expect(api1.content).toBe("https://t.example.com");
+
+  const [sid2, p2] = uploadSessionSkill.mock.calls[2] as [string, { name: string; files: FileEntry[] }];
+  expect(sid2).toBe("s-1");
+  expect(p2.name).toBe("local/structure-review-rules");
+  expect(p2.files.map((f) => f.path)).toEqual([
+    "SKILL.md", "scripts/smart_doc_list_clauses.py", "scripts/smart_doc_rules.py", "scripts/api_base.txt",
+  ]);
+  const api2 = p2.files.find((f) => f.path === "scripts/api_base.txt")!;
+  expect(api2.content).toBe("https://t.example.com");
 });
 
-test("未配 env → toast.warning 且两个 skill 的 api_base.txt 为空串，仍推送", async () => {
+test("未配 env → toast.warning 且三个 skill 的 api_base.txt 为空串，仍推送", async () => {
   vi.stubEnv("VITE_SMART_DOC_API", "");
   await pushRuleDocSkill("s-2");
   expect(toast.warning).toHaveBeenCalled();
-  expect(uploadSessionSkill).toHaveBeenCalledTimes(2);
+  expect(uploadSessionSkill).toHaveBeenCalledTimes(3);
   for (const call of uploadSessionSkill.mock.calls) {
     const payload = call[1] as { files: FileEntry[] };
     expect(payload.files.find((f) => f.path === "scripts/api_base.txt")!.content).toBe("");

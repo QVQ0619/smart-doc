@@ -5,9 +5,13 @@ import SHIM_PY from "../../backend/agent_shim/smart_doc_add.py?raw";
 import EXTRACT_SKILL_MD from "../../blade/skills/extract-review-rules/SKILL.md?raw";
 import SEGMENTS_PY from "../../backend/agent_shim/smart_doc_segments.py?raw";
 import CLAUSES_PY from "../../backend/agent_shim/smart_doc_clauses.py?raw";
+import STRUCT_SKILL_MD from "../../blade/skills/structure-review-rules/SKILL.md?raw";
+import LIST_CLAUSES_PY from "../../backend/agent_shim/smart_doc_list_clauses.py?raw";
+import RULES_PY from "../../backend/agent_shim/smart_doc_rules.py?raw";
 
 const SAVE_SKILL_NAME = "local/save-rule-doc";
 const EXTRACT_SKILL_NAME = "local/extract-review-rules";
+const STRUCT_SKILL_NAME = "local/structure-review-rules";
 
 type FileEntry = { path: string; content: string };
 
@@ -48,6 +52,12 @@ export async function pushRuleDocSkill(sessionId: string): Promise<void> {
     { path: "SKILL.md", content: EXTRACT_SKILL_MD },
     { path: "scripts/smart_doc_segments.py", content: SEGMENTS_PY },
     { path: "scripts/smart_doc_clauses.py", content: CLAUSES_PY },
+    { path: "scripts/api_base.txt", content: apiBase ?? "" },
+  ]);
+  await pushOne(sessionId, STRUCT_SKILL_NAME, [
+    { path: "SKILL.md", content: STRUCT_SKILL_MD },
+    { path: "scripts/smart_doc_list_clauses.py", content: LIST_CLAUSES_PY },
+    { path: "scripts/smart_doc_rules.py", content: RULES_PY },
     { path: "scripts/api_base.txt", content: apiBase ?? "" },
   ]);
 }
