@@ -137,3 +137,17 @@ class ExtractRulesResult(BaseModel):
     rules_inserted: int
     skipped: int
     missing_provenance: int
+
+
+class ClauseUpdateIn(BaseModel):
+    clause_no: str
+    clause_text: Optional[str] = None
+
+
+class RuleUpdateIn(BaseModel):
+    name: str
+    logic: Optional[str] = None
+    dimension_code: str
+    decision_type: str
+    disposition: str
+    binding_class: str

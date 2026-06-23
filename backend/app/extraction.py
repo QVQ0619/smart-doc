@@ -3,9 +3,10 @@ from __future__ import annotations
 from sqlalchemy import delete, select
 from sqlmodel import Session
 
-from .models import ParseSegment, RegulationClause, StandardDoc
+from .models import (ParseSegment, RegulationClause, ReviewRuleClause,
+                     ReviewRuleVersion, StandardDoc)
 from .schemas import ClauseIn, ClauseWriteResult
-from .structuring import delete_rules_for_doc
+from .structuring import delete_rule_cascade, delete_rules_for_doc
 
 
 def replace_clauses(db: Session, doc_id: int, clauses: list[ClauseIn]) -> ClauseWriteResult:
@@ -38,3 +39,39 @@ def replace_clauses(db: Session, doc_id: int, clauses: list[ClauseIn]) -> Clause
         inserted += 1
     db.commit()
     return ClauseWriteResult(inserted=inserted, missing_provenance=missing)
+
+
+def update_clause(db: Session, doc_id: int, clause_id: int, clause_no: str,
+                  clause_text: str | None) -> RegulationClause:
+    """原地改条款的条号/条文。不归属该文档 → LookupError(404);空条号 → ValueError(422)。"""
+    rc = db.get(RegulationClause, clause_id)
+    if rc is None or rc.standard_doc_id != doc_id:
+        raise LookupError(f"clause {clause_id} not in doc {doc_id}")
+    if not (clause_no or "").strip():
+        raise ValueError("clause_no 不能为空")
+    rc.clause_no = clause_no
+    rc.clause_text = clause_text
+    db.add(rc)
+    db.commit()
+    db.refresh(rc)
+    return rc
+
+
+def delete_clause(db: Session, doc_id: int, clause_id: int) -> None:
+    """删条款;若被 review_rule 关联,连带删除该规则全套(避免 list_rules inner join 出幽灵)。"""
+    rc = db.get(RegulationClause, clause_id)
+    if rc is None or rc.standard_doc_id != doc_id:
+        raise LookupError(f"clause {clause_id} not in doc {doc_id}")
+    version_ids = set(
+        db.execute(
+            select(ReviewRuleClause.rule_version_id).where(ReviewRuleClause.clause_id == clause_id)
+        ).scalars().all()
+    )
+    rule_ids = set(
+        db.execute(
+            select(ReviewRuleVersion.rule_id).where(ReviewRuleVersion.id.in_(version_ids))
+        ).scalars().all()
+    ) if version_ids else set()
+    delete_rule_cascade(db, rule_ids)
+    db.delete(rc)
+    db.commit()

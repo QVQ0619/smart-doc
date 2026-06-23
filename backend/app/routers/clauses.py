@@ -1,15 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlmodel import Session
 
 from ..auth import require_api_key
 from ..db import get_session
-from ..extraction import replace_clauses
+from ..extraction import delete_clause, replace_clauses, update_clause
 from ..models import (ParseSegment, RegulationClause, ReviewDimension, ReviewRule,
                       ReviewRuleClause, ReviewRuleVersion, StandardDoc)
-from ..schemas import (ClauseBatchIn, ClauseOut, ClauseWriteResult,
+from ..schemas import (ClauseBatchIn, ClauseOut, ClauseUpdateIn, ClauseWriteResult,
                        ExtractRulesBatchIn, ExtractRulesResult, RuleBatchIn,
-                       RuleOut, RuleWriteResult, SegmentOut)
+                       RuleOut, RuleUpdateIn, RuleWriteResult, SegmentOut)
 from ..structuring import extract_and_structure, replace_rules
 
 router = APIRouter(tags=["clauses"])
@@ -58,6 +58,44 @@ def list_clauses(doc_id: int, db: Session = Depends(get_session)) -> list[Clause
         )
         for rc, ps in rows
     ]
+
+
+def _clause_out(db: Session, clause_id: int) -> ClauseOut:
+    rc, ps = db.execute(
+        select(RegulationClause, ParseSegment)
+        .outerjoin(ParseSegment, RegulationClause.source_segment_id == ParseSegment.id)
+        .where(RegulationClause.id == clause_id)
+    ).first()
+    return ClauseOut(
+        id=rc.id, clause_no=rc.clause_no, clause_text=rc.clause_text,
+        source_segment_id=rc.source_segment_id,
+        page_no=(ps.page_no if ps else None), locator=(ps.locator if ps else None),
+    )
+
+
+@router.patch("/standard-docs/{doc_id}/clauses/{clause_id}", response_model=ClauseOut,
+              dependencies=[Depends(require_api_key)])
+def patch_clause(doc_id: int, clause_id: int, body: ClauseUpdateIn,
+                 db: Session = Depends(get_session)) -> ClauseOut:
+    _require_doc(db, doc_id)
+    try:
+        update_clause(db, doc_id, clause_id, body.clause_no, body.clause_text)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="clause not found")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return _clause_out(db, clause_id)
+
+
+@router.delete("/standard-docs/{doc_id}/clauses/{clause_id}", status_code=204,
+               dependencies=[Depends(require_api_key)])
+def del_clause(doc_id: int, clause_id: int, db: Session = Depends(get_session)) -> Response:
+    _require_doc(db, doc_id)
+    try:
+        delete_clause(db, doc_id, clause_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="clause not found")
+    return Response(status_code=204)
 
 
 @router.post("/standard-docs/{doc_id}/rules", response_model=RuleWriteResult, dependencies=[Depends(require_api_key)])

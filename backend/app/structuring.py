@@ -40,6 +40,23 @@ def delete_rules_for_doc(db: Session, doc_id: int) -> None:
         db.execute(delete(ReviewRule).where(ReviewRule.id.in_(old_rule_ids)))
 
 
+def delete_rule_cascade(db: Session, rule_ids: set[int]) -> None:
+    """循环 FK 安全地删除给定 review_rule 全套(version + rule_clause + rule)。不 commit。
+    断 current_version_id → 删 rule_clause → version → rule。供单条删规则/删条款级联复用。"""
+    if not rule_ids:
+        return
+    version_ids = set(
+        db.execute(
+            select(ReviewRuleVersion.id).where(ReviewRuleVersion.rule_id.in_(rule_ids))
+        ).scalars().all()
+    )
+    db.execute(update(ReviewRule).where(ReviewRule.id.in_(rule_ids)).values(current_version_id=None))
+    if version_ids:
+        db.execute(delete(ReviewRuleClause).where(ReviewRuleClause.rule_version_id.in_(version_ids)))
+        db.execute(delete(ReviewRuleVersion).where(ReviewRuleVersion.id.in_(version_ids)))
+    db.execute(delete(ReviewRule).where(ReviewRule.id.in_(rule_ids)))
+
+
 def replace_rules(db: Session, doc_id: int, rules: list[RuleIn]) -> RuleWriteResult:
     """按文档幂等替换该文档的 review_rule(1:1 升格)。
     经 review_rule_clause→regulation_clause 反查该文档既有 rule，删后重建。
