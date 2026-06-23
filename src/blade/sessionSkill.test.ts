@@ -28,28 +28,31 @@ beforeEach(() => {
 
 test("配了 VITE_SMART_DOC_API → 推送三个 skill(save-rule-doc + extract-review-rules + structure-review-rules)", async () => {
   vi.stubEnv("VITE_SMART_DOC_API", "https://t.example.com");
+  vi.stubEnv("VITE_SMART_DOC_API_KEY", "k-secret");
   await pushRuleDocSkill("s-1");
 
   expect(uploadSessionSkill).toHaveBeenCalledTimes(3);
   const [sid0, p0] = uploadSessionSkill.mock.calls[0] as [string, { name: string; files: FileEntry[] }];
   expect(sid0).toBe("s-1");
   expect(p0.name).toBe("local/save-rule-doc");
-  expect(p0.files.map((f) => f.path)).toEqual(["SKILL.md", "scripts/smart_doc_add.py", "scripts/api_base.txt"]);
+  expect(p0.files.map((f) => f.path)).toEqual(["SKILL.md", "scripts/smart_doc_add.py", "scripts/api_base.txt", "scripts/api_key.txt"]);
 
   const [sid1, p1] = uploadSessionSkill.mock.calls[1] as [string, { name: string; files: FileEntry[] }];
   expect(sid1).toBe("s-1");
   expect(p1.name).toBe("local/extract-review-rules");
   expect(p1.files.map((f) => f.path)).toEqual([
-    "SKILL.md", "scripts/smart_doc_segments.py", "scripts/smart_doc_clauses.py", "scripts/api_base.txt",
+    "SKILL.md", "scripts/smart_doc_segments.py", "scripts/smart_doc_clauses.py", "scripts/api_base.txt", "scripts/api_key.txt",
   ]);
   const api1 = p1.files.find((f) => f.path === "scripts/api_base.txt")!;
   expect(api1.content).toBe("https://t.example.com");
+  const key1 = p1.files.find((f) => f.path === "scripts/api_key.txt")!;
+  expect(key1.content).toBe("k-secret");
 
   const [sid2, p2] = uploadSessionSkill.mock.calls[2] as [string, { name: string; files: FileEntry[] }];
   expect(sid2).toBe("s-1");
   expect(p2.name).toBe("local/structure-review-rules");
   expect(p2.files.map((f) => f.path)).toEqual([
-    "SKILL.md", "scripts/smart_doc_list_clauses.py", "scripts/smart_doc_rules.py", "scripts/api_base.txt",
+    "SKILL.md", "scripts/smart_doc_list_clauses.py", "scripts/smart_doc_rules.py", "scripts/api_base.txt", "scripts/api_key.txt",
   ]);
   const api2 = p2.files.find((f) => f.path === "scripts/api_base.txt")!;
   expect(api2.content).toBe("https://t.example.com");

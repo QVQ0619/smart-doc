@@ -20,6 +20,7 @@ description: 当用户要求把某文档已抽取的审查条款结构化/升格
    LC="$(find / -path '*structure-review-rules/scripts/smart_doc_list_clauses.py' 2>/dev/null | head -1)"
    DIR="$(dirname "$LC")"
    API="$(cat "$DIR/api_base.txt" | tr -d '\r\n')"
+   KEY="$(cat "$DIR/api_key.txt" 2>/dev/null | tr -d '\r\n')"
    ```
 2. 读取目标文档条款（参数可为 doc_id / doc_code（SD-开头）/ 标题子串）：
    ```bash
@@ -45,7 +46,7 @@ description: 当用户要求把某文档已抽取的审查条款结构化/升格
    {"rules":[{"source_clause_id":9,"dimension_code":"compliance","name":"同年限申请1项同类型","logic":"同类型项目同年限1项","decision_type":"hard","disposition":"reject","binding_class":"common"}]}
    JSON
    # 上面是示例：各字段必须替换为对应条款的真实判定，切勿照抄示例
-   SMART_DOC_API="$API" python3 "$DIR/smart_doc_rules.py" "<doc_id>" /tmp/rules.json
+   SMART_DOC_API="$API" SMART_DOC_API_KEY="$KEY" python3 "$DIR/smart_doc_rules.py" "<doc_id>" /tmp/rules.json
    ```
 5. 解读返回 `inserted=<n> skipped=<m>`：回报「已结构化并入库 N 条规则」；若 m>0 补一句
    「其中 M 条因字段非法被跳过」。

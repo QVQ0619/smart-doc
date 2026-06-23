@@ -20,6 +20,11 @@ export function getSmartDocApi(): string | undefined {
   return v && v.length > 0 ? v : undefined;
 }
 
+export function getSmartDocApiKey(): string | undefined {
+  const v = import.meta.env.VITE_SMART_DOC_API_KEY?.trim();
+  return v && v.length > 0 ? v : undefined;
+}
+
 async function pushOne(
   sessionId: string,
   name: `${string}/${string}`,
@@ -40,6 +45,7 @@ async function pushOne(
  */
 export async function pushRuleDocSkill(sessionId: string): Promise<void> {
   const apiBase = getSmartDocApi();
+  const apiKey = getSmartDocApiKey();
   if (!apiBase) {
     toast.warning("未配置 VITE_SMART_DOC_API，agent 入库/抽取会失败（请在 .env 配置隧道域名后重启）");
   }
@@ -47,17 +53,20 @@ export async function pushRuleDocSkill(sessionId: string): Promise<void> {
     { path: "SKILL.md", content: SKILL_MD },
     { path: "scripts/smart_doc_add.py", content: SHIM_PY },
     { path: "scripts/api_base.txt", content: apiBase ?? "" },
+    { path: "scripts/api_key.txt", content: apiKey ?? "" },
   ]);
   await pushOne(sessionId, EXTRACT_SKILL_NAME, [
     { path: "SKILL.md", content: EXTRACT_SKILL_MD },
     { path: "scripts/smart_doc_segments.py", content: SEGMENTS_PY },
     { path: "scripts/smart_doc_clauses.py", content: CLAUSES_PY },
     { path: "scripts/api_base.txt", content: apiBase ?? "" },
+    { path: "scripts/api_key.txt", content: apiKey ?? "" },
   ]);
   await pushOne(sessionId, STRUCT_SKILL_NAME, [
     { path: "SKILL.md", content: STRUCT_SKILL_MD },
     { path: "scripts/smart_doc_list_clauses.py", content: LIST_CLAUSES_PY },
     { path: "scripts/smart_doc_rules.py", content: RULES_PY },
     { path: "scripts/api_base.txt", content: apiBase ?? "" },
+    { path: "scripts/api_key.txt", content: apiKey ?? "" },
   ]);
 }

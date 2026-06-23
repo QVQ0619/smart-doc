@@ -20,6 +20,7 @@ description: 当用户要求从某已识别规则文档中抽取审查规则/条
    SEG="$(find / -path '*extract-review-rules/scripts/smart_doc_segments.py' 2>/dev/null | head -1)"
    DIR="$(dirname "$SEG")"
    API="$(cat "$DIR/api_base.txt" | tr -d '\r\n')"
+   KEY="$(cat "$DIR/api_key.txt" 2>/dev/null | tr -d '\r\n')"
    ```
 2. 读取目标文档段落（参数可为 doc_id / doc_code（SD-开头）/ 标题子串）：
    ```bash
@@ -39,7 +40,7 @@ description: 当用户要求从某已识别规则文档中抽取审查规则/条
    {"clauses":[{"clause_no":"第一条","clause_text":"申请人应当具有高级专业技术职称。","source_segment_id":12}]}
    JSON
    # 上面是示例：clause_text 必须替换为该条真实条文（取自对应段落），切勿照抄此示例文字
-   SMART_DOC_API="$API" python3 "$DIR/smart_doc_clauses.py" "<doc_id>" /tmp/clauses.json
+   SMART_DOC_API="$API" SMART_DOC_API_KEY="$KEY" python3 "$DIR/smart_doc_clauses.py" "<doc_id>" /tmp/clauses.json
    ```
 5. 解读返回 `inserted=<n> missing_provenance=<m>`：回报「已抽取并入库 N 条规则」；若 m>0 补一句
    「其中 M 条未能定位到出处」。
