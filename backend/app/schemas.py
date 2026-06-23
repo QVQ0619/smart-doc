@@ -92,14 +92,14 @@ class RuleOut(BaseModel):
     rule_code: str
     version: str
     name: str
-    logic: Optional[str]
+    logic: Optional[str] = None
     dimension_code: str
     dimension_name: str
     decision_type: str
     disposition: str
     binding_class: str
-    source_clause_id: Optional[int]
-    clause_no: Optional[str]
-    clause_text: Optional[str]
-    page_no: Optional[int]
-    locator: Optional[Any]
+    source_clause_id: Optional[int] = None
+    clause_no: Optional[str] = None
+    clause_text: Optional[str] = None
+    page_no: Optional[int] = None
+    locator: Optional[Any] = None
