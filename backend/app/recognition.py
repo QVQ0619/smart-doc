@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pdfplumber
 from docx import Document
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlmodel import Session
 
 from . import ocr  # OCR 可选模块；通过模块属性访问以便测试 monkeypatch
@@ -189,3 +189,13 @@ def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> Re
         doc_id=doc_id, doc_code=sd.doc_code, recognition_status=status,
         segment_count=segment_count, page_count=page_count, error=error if status == "failed" else None,
     )
+
+
+def reset_stuck_processing(db: Session) -> int:
+    """应用启动时把残留 processing(进程内后台任务因重启中断) 重置为 pending。"""
+    rows = db.execute(select(StandardDoc).where(StandardDoc.recognition_status == "processing")).scalars().all()
+    for sd in rows:
+        sd.recognition_status = "pending"
+        db.add(sd)
+    db.commit()
+    return len(rows)

@@ -7,6 +7,7 @@ from sqlmodel import Session
 from .config import settings
 from .db import engine
 from .dimensions import ensure_dimensions
+from .recognition import reset_stuck_processing
 from .routers import standard_docs, clauses
 
 
@@ -15,6 +16,7 @@ def create_app() -> FastAPI:
     async def lifespan(app: FastAPI):
         with Session(engine) as db:
             ensure_dimensions(db)
+            reset_stuck_processing(db)
         yield
 
     app = FastAPI(title="立项审查文件存储后端", lifespan=lifespan)

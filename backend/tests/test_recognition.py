@@ -187,3 +187,21 @@ def test_recognize_image_without_ocr_degrades(tmp_path, storage_dir, _test_db, m
     assert res.recognition_status == "failed"
     assert "OCR" in (res.error or "")
     assert _count_segments(doc_id) == 0
+
+
+def test_reset_stuck_processing(tmp_path, storage_dir, _test_db):
+    from app.recognition import reset_stuck_processing
+    storage = FileStorage(storage_dir)
+    src = tmp_path / "r.docx"
+    from docx import Document
+    d = Document(); d.add_paragraph("x"); d.save(str(src))
+    doc_id = _seed_doc(storage, src, "r.docx")
+    with Session(engine) as s:
+        sd = s.get(StandardDoc, doc_id)
+        sd.recognition_status = "processing"
+        s.add(sd); s.commit()
+    with Session(engine) as s:
+        n = reset_stuck_processing(s)
+    assert n == 1
+    with Session(engine) as s:
+        assert s.get(StandardDoc, doc_id).recognition_status == "pending"
