@@ -9,6 +9,7 @@ from docx import Document
 from sqlalchemy import delete
 from sqlmodel import Session
 
+from . import ocr  # OCR 可选模块；通过模块属性访问以便测试 monkeypatch
 from .models import FileObject, ParseSegment, StandardDoc
 from .schemas import RecognizeResult
 from .storage import FileStorage
@@ -17,6 +18,7 @@ MAX_SEGMENT_CHARS = 65536
 
 # DB 约束：segment_type IN ('text','table','title','figure')
 _SEGMENT_TYPE_MAP = {"heading": "title", "paragraph": "text"}
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
 
 
 @dataclass
@@ -44,20 +46,37 @@ def _rows_to_text(rows) -> str:
 
 def parse_pdf(path: Path) -> list[SegmentDraft]:
     drafts: list[SegmentDraft] = []
-    with pdfplumber.open(str(path)) as pdf:
-        for pageno, page in enumerate(pdf.pages, start=1):
-            tables = page.find_tables()
-            text_region = page
-            for t in tables:
-                text_region = text_region.outside_bbox(t.bbox)
-            text = text_region.extract_text() or ""
-            blocks = [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
-            for bi, block in enumerate(blocks):
-                drafts.append(SegmentDraft(pageno, {"page": pageno, "block_index": bi}, "paragraph", _clip(block)))
-            for ti, t in enumerate(tables):
-                ttext = _rows_to_text(t.extract())
-                if ttext:
-                    drafts.append(SegmentDraft(pageno, {"page": pageno, "table_index": ti}, "table", _clip(ttext)))
+    fdoc = None
+    if ocr.OCR_AVAILABLE:
+        import fitz
+        fdoc = fitz.open(str(path))
+    try:
+        with pdfplumber.open(str(path)) as pdf:
+            for pageno, page in enumerate(pdf.pages, start=1):
+                tables = page.find_tables()
+                text_region = page
+                for t in tables:
+                    text_region = text_region.outside_bbox(t.bbox)
+                text = text_region.extract_text() or ""
+                blocks = [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
+                if not blocks and not tables and fdoc is not None:
+                    # 该页无文本层，疑似扫描页 -> OCR 回退
+                    lines = ocr.ocr_pdf_page(fdoc[pageno - 1])
+                    ocr_text = "\n".join(lines).strip()
+                    if ocr_text:
+                        drafts.append(SegmentDraft(
+                            pageno, {"page": pageno, "block_index": 0, "ocr": True},
+                            "paragraph", _clip(ocr_text)))
+                    continue
+                for bi, block in enumerate(blocks):
+                    drafts.append(SegmentDraft(pageno, {"page": pageno, "block_index": bi}, "paragraph", _clip(block)))
+                for ti, t in enumerate(tables):
+                    ttext = _rows_to_text(t.extract())
+                    if ttext:
+                        drafts.append(SegmentDraft(pageno, {"page": pageno, "table_index": ti}, "table", _clip(ttext)))
+    finally:
+        if fdoc is not None:
+            fdoc.close()
     return drafts
 
 
@@ -88,6 +107,16 @@ def parse_docx(path: Path) -> list[SegmentDraft]:
     return drafts
 
 
+def parse_image(path: Path) -> list[SegmentDraft]:
+    if not ocr.OCR_AVAILABLE:
+        return []
+    lines = ocr.ocr_image(path)
+    text = "\n".join(lines).strip()
+    if not text:
+        return []
+    return [SegmentDraft(1, {"page": 1, "block_index": 0, "ocr": True}, "paragraph", _clip(text))]
+
+
 def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> RecognizeResult:
     sd = db.get(StandardDoc, doc_id)
     if sd is None:
@@ -108,11 +137,21 @@ def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> Re
             elif ext == ".pdf":
                 drafts = parse_pdf(path)
                 if not drafts:
-                    error = "未从 PDF 抽取到文本，可能是扫描件（暂不支持 OCR）"
+                    if ocr.OCR_AVAILABLE:
+                        error = "未从 PDF 抽取到文本，可能是扫描件且 OCR 未识别出文字"
+                    else:
+                        error = "未从 PDF 抽取到文本，疑似扫描件；未安装 OCR 组件，请 pip install rapidocr-onnxruntime pymupdf 后重试"
             elif ext == ".docx":
                 drafts = parse_docx(path)
                 if not drafts:
                     error = "文档为空，未抽取到任何内容"
+            elif ext in IMAGE_EXTS:
+                drafts = parse_image(path)
+                if not drafts:
+                    if ocr.OCR_AVAILABLE:
+                        error = "未从图片中识别到文字"
+                    else:
+                        error = "检测到图片文件，但未安装 OCR 组件，请 pip install rapidocr-onnxruntime pymupdf 后重试"
             else:
                 raise UnsupportedFormatError(ext or "(无扩展名)")
     except UnsupportedFormatError as e:
