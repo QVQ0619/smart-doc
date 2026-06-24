@@ -207,3 +207,28 @@ test("展开行规则 Tab 展示 review_rule 结构化字段与出处", async ()
   expect(screen.getByText("合规性")).toBeInTheDocument();
   expect(screen.getByText("第5页第1段")).toBeInTheDocument();
 });
+
+test("processing 状态显示识别中徽标", async () => {
+  vi.mocked(api.listStandardDocs).mockResolvedValue([
+    { ...sample, recognition_status: "processing" },
+  ] as never);
+  renderLib();
+  expect(await screen.findByText("识别中")).toBeInTheDocument();
+});
+
+test("有 processing 行时轮询间隔收紧到 3 秒", async () => {
+  vi.useFakeTimers();
+  try {
+    vi.clearAllMocks();
+    vi.mocked(api.listStandardDocs).mockResolvedValue([
+      { ...sample, recognition_status: "processing" },
+    ] as never);
+    renderLib();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.mocked(api.listStandardDocs)).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(3000);            // 3s 即触发下一次
+    expect(vi.mocked(api.listStandardDocs)).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});

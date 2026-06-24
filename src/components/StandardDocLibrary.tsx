@@ -260,7 +260,12 @@ export default function StandardDocLibrary() {
   const listQuery = useQuery({
     queryKey: KEY,
     queryFn: listStandardDocs,
-    refetchInterval: 10000,
+    refetchInterval: (query) => {
+      const data = query.state.data as StandardDoc[] | undefined;
+      return Array.isArray(data) && data.some((d) => d.recognition_status === "processing")
+        ? 3000
+        : 10000;
+    },
   });
 
   const deleteMut = useMutation({
@@ -274,6 +279,7 @@ export default function StandardDocLibrary() {
 
   const STATUS: Record<string, { color: string; text: string }> = {
     pending: { color: "default", text: "待识别" },
+    processing: { color: "blue", text: "识别中" },
     done: { color: "green", text: "已识别" },
     failed: { color: "red", text: "识别失败" },
   };
@@ -281,7 +287,8 @@ export default function StandardDocLibrary() {
   const recognizeMut = useMutation({
     mutationFn: (id: number) => recognizeStandardDoc(id),
     onSuccess: (res) => {
-      if (res.recognition_status === "done") toast.success(`已识别 ${res.segment_count} 段`);
+      if (res.recognition_status === "processing") toast.info("识别中…");
+      else if (res.recognition_status === "done") toast.success(`已识别 ${res.segment_count} 段`);
       else toast.warning("识别失败：" + (res.error ?? "未知原因"));
       qc.invalidateQueries({ queryKey: KEY });
     },
