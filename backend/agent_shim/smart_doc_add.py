@@ -15,6 +15,7 @@ import json
 import mimetypes
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -65,6 +66,37 @@ def upload(api_base: str, paths: list[str], timeout: int, force: bool = False, r
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _list_docs(api_base: str, timeout: int) -> list[dict]:
+    url = api_base.rstrip("/") + "/api/standard-docs"
+    headers = {}
+    api_key = os.environ.get("SMART_DOC_API_KEY")
+    if api_key:
+        headers["X-API-Key"] = api_key
+    req = urllib.request.Request(url, method="GET", headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def wait_for_done(list_fn, doc_code, timeout=120, interval=2.0,
+                  sleep_fn=time.sleep, clock=time.monotonic):
+    """轮询 list_fn() 直到目标 doc 的 recognition_status 离开 pending/processing，或超时。
+
+    返回最终状态字符串(done/failed)；未找到或超时返回最后一次观察到的状态(可能为 None/processing)。
+    """
+    deadline = clock() + timeout
+    last = None
+    while True:
+        for d in list_fn():
+            if d.get("doc_code") == doc_code:
+                last = d.get("recognition_status")
+                break
+        if last not in ("pending", "processing", None):
+            return last
+        if clock() >= deadline:
+            return last
+        sleep_fn(interval)
+
+
 def main(argv: list[str]) -> int:
     args = argv[1:]
     force = "--force" in args
@@ -102,9 +134,10 @@ def main(argv: list[str]) -> int:
             f"doc_code={doc.get('doc_code')} status={doc.get('status')} title={doc.get('title')} file={doc.get('file_name')}\n"
         )
         if "recognition_status" in doc:
-            sys.stdout.write(
-                f"recognition={doc.get('recognition_status')} segments={doc.get('segment_count')}\n"
+            final = wait_for_done(
+                lambda: _list_docs(api_base, timeout), doc.get("doc_code"), timeout=timeout
             )
+            sys.stdout.write(f"recognition={final}\n")
     conflicts = result.get("conflicts", [])
     for c in conflicts:
         sys.stdout.write(
