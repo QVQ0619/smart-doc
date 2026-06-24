@@ -151,3 +151,12 @@ class RuleUpdateIn(BaseModel):
     decision_type: str
     disposition: str
     binding_class: str
+
+
+class ConfigPackageOut(BaseModel):
+    doc_id: int
+    doc_code: str
+    title: str
+    version: str
+    rule_count: int
+    dimensions: list[str]
