@@ -10,6 +10,7 @@ from agent_shim.smart_doc_add import build_multipart, main
 class _Handler(BaseHTTPRequestHandler):
     status = 200
     payload = {"uploaded": [], "failed": []}
+    list_payload: list = []  # GET /api/standard-docs 返回(供上传后轮询识别状态)
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -19,6 +20,12 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(self.__class__.payload).encode("utf-8"))
 
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps(self.__class__.list_payload).encode("utf-8"))
+
     def log_message(self, *args):  # 静音
         pass
 
@@ -27,6 +34,7 @@ class _Handler(BaseHTTPRequestHandler):
 def stub_server():
     _Handler.status = 200
     _Handler.payload = {"uploaded": [], "failed": []}
+    _Handler.list_payload = []
     server = HTTPServer(("127.0.0.1", 0), _Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -102,15 +110,16 @@ def test_main_missing_api_env_returns_6(tmp_path, monkeypatch):
 def test_main_prints_recognition_summary_when_present(tmp_path, monkeypatch, capsys, stub_server):
     base, handler = stub_server
     handler.status = 200
+    # 上传立即返回 processing；shim 随后轮询列表端点直至终态
     handler.payload = {"uploaded": [{"doc_code": "SD-x", "title": "T", "file_name": "T.docx",
-                                     "recognition_status": "done", "segment_count": 5}], "failed": []}
+                                     "recognition_status": "processing", "segment_count": None}], "failed": []}
+    handler.list_payload = [{"doc_code": "SD-x", "recognition_status": "done"}]
     monkeypatch.setenv("SMART_DOC_API", base)
     f = tmp_path / "T.docx"
     f.write_bytes(b"x")
     assert main(["smart-doc-add", str(f)]) == 0
     out = capsys.readouterr().out
     assert "recognition=done" in out
-    assert "segments=5" in out
 
 
 def test_main_no_recognition_field_is_backward_compatible(tmp_path, monkeypatch, capsys, stub_server):
