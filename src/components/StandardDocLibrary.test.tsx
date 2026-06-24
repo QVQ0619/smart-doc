@@ -135,6 +135,50 @@ test("条款行点删除→确认调 deleteClause", async () => {
   await waitFor(() => expect(vi.mocked(api.deleteClause)).toHaveBeenCalledWith(1, 1));
 });
 
+test("规则行点编辑→保存(沿用预填值)调 updateRule", async () => {
+  vi.mocked(api.listClauses).mockResolvedValue([] as never);
+  vi.mocked(api.listRules).mockResolvedValue([
+    {
+      id: 5, rule_code: "RULE-x", version: "V1.0", name: "规则A", logic: null,
+      dimension_code: "compliance", dimension_name: "合规性",
+      decision_type: "hard", disposition: "reject", binding_class: "common",
+      source_clause_id: 9, clause_no: "一", clause_text: "x", page_no: 1, locator: null,
+    },
+  ] as never);
+  const { container } = renderLib();
+  await screen.findByText("政策A");
+  await userEvent.click(container.querySelector(".ant-table-row-expand-icon") as HTMLElement);
+  const row = container.querySelector(".ant-table-expanded-row") as HTMLElement;
+  await within(row).findByText("规则A");
+  await userEvent.click(within(row).getByText("编辑"));
+  await screen.findByText("编辑规则");
+  await userEvent.click(screen.getByRole("button", { name: /保.?存/ }));
+  await waitFor(() => expect(vi.mocked(api.updateRule)).toHaveBeenCalledWith(1, 5, {
+    name: "规则A", logic: null, dimension_code: "compliance",
+    decision_type: "hard", disposition: "reject", binding_class: "common",
+  }));
+});
+
+test("规则行点删除→确认调 deleteRule", async () => {
+  vi.mocked(api.listClauses).mockResolvedValue([] as never);
+  vi.mocked(api.listRules).mockResolvedValue([
+    {
+      id: 5, rule_code: "RULE-x", version: "V1.0", name: "规则A", logic: null,
+      dimension_code: "compliance", dimension_name: "合规性",
+      decision_type: "hard", disposition: "reject", binding_class: "common",
+      source_clause_id: 9, clause_no: "一", clause_text: "x", page_no: 1, locator: null,
+    },
+  ] as never);
+  const { container } = renderLib();
+  await screen.findByText("政策A");
+  await userEvent.click(container.querySelector(".ant-table-row-expand-icon") as HTMLElement);
+  const row = container.querySelector(".ant-table-expanded-row") as HTMLElement;
+  await within(row).findByText("规则A");
+  await userEvent.click(within(row).getByText("删除"));
+  await userEvent.click(await screen.findByRole("button", { name: /确.?定/ }));
+  await waitFor(() => expect(vi.mocked(api.deleteRule)).toHaveBeenCalledWith(1, 5));
+});
+
 test("展开行规则 Tab 展示 review_rule 结构化字段与出处", async () => {
   vi.mocked(api.listStandardDocs).mockResolvedValue([
     {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Form, Input, Modal, Popconfirm, Space, Table, Tabs, Tag } from "antd";
+import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tabs, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -12,9 +12,12 @@ import {
   listRules,
   updateClause,
   deleteClause,
+  updateRule,
+  deleteRule,
   type StandardDoc,
   type Clause,
   type Rule,
+  type RuleUpdate,
 } from "../api/standardDocs";
 
 function humanSize(bytes: number | null): string {
@@ -117,6 +120,18 @@ const DECISION_LABEL: Record<string, string> = { hard: "硬性", verify: "需核
 const DISPOSITION_LABEL: Record<string, string> = { reject: "驳回", fix: "补正", review: "复核" };
 const BINDING_LABEL: Record<string, string> = { common: "通用", parameterized: "参数化", specific: "特定" };
 
+const DIMENSION_LABEL: Record<string, string> = {
+  completeness: "完整性",
+  normativeness: "规范性",
+  compliance: "合规性",
+  consistency: "一致性",
+  rationality: "合理性",
+  authenticity: "真实性",
+};
+
+const opts = (m: Record<string, string>) =>
+  Object.entries(m).map(([value, label]) => ({ value, label }));
+
 function ruleProvenance(r: Rule): string {
   const loc = r.locator ?? {};
   const raw = (loc["block_index"] ?? loc["para_index"]);
@@ -139,11 +154,92 @@ const RULE_COLS: ColumnsType<Rule> = [
 ];
 
 function RuleList({ docId }: { docId: number }) {
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: ["rules", docId], queryFn: () => listRules(docId) });
+  const [editing, setEditing] = useState<Rule | null>(null);
+  const [form] = Form.useForm();
+
+  const updateMut = useMutation({
+    mutationFn: (v: RuleUpdate) => updateRule(docId, editing!.id, v),
+    onSuccess: () => {
+      toast.success("已保存");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["rules", docId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => deleteRule(docId, id),
+    onSuccess: () => {
+      toast.success("已删除");
+      qc.invalidateQueries({ queryKey: ["rules", docId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+  });
+
+  function openEdit(r: Rule) {
+    setEditing(r);
+    form.setFieldsValue({
+      name: r.name, logic: r.logic ?? "", dimension_code: r.dimension_code,
+      decision_type: r.decision_type, disposition: r.disposition, binding_class: r.binding_class,
+    });
+  }
+
+  const cols: ColumnsType<Rule> = [
+    ...RULE_COLS,
+    {
+      title: "操作", key: "ops", width: 120,
+      render: (_: unknown, r: Rule) => (
+        <Space>
+          <a onClick={() => openEdit(r)}>编辑</a>
+          <Popconfirm title="确认删除该规则?" okText="确定" cancelText="取消"
+            onConfirm={() => deleteMut.mutate(r.id)}>
+            <a>删除</a>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
   if (q.isLoading) return <span>加载中…</span>;
   const data = q.data ?? [];
   if (!data.length) return <span>尚未结构化，可在聊天里让 AI 把本文档条款结构化为规则</span>;
-  return <Table rowKey="id" size="small" dataSource={data} columns={RULE_COLS} pagination={false} />;
+  return (
+    <>
+      <Table rowKey="id" size="small" dataSource={data} columns={cols} pagination={false} />
+      <Modal
+        title="编辑规则" open={!!editing} okText="保存" cancelText="取消"
+        confirmLoading={updateMut.isPending}
+        onOk={() => form.submit()} onCancel={() => setEditing(null)} destroyOnClose
+      >
+        <Form form={form} layout="vertical"
+          onFinish={(v) => updateMut.mutate({
+            name: v.name, logic: v.logic || null, dimension_code: v.dimension_code,
+            decision_type: v.decision_type, disposition: v.disposition, binding_class: v.binding_class,
+          })}>
+          <Form.Item name="name" label="规则名" rules={[{ required: true, message: "规则名必填" }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="logic" label="判定逻辑">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item name="dimension_code" label="维度" rules={[{ required: true }]}>
+            <Select options={opts(DIMENSION_LABEL)} />
+          </Form.Item>
+          <Form.Item name="decision_type" label="判定" rules={[{ required: true }]}>
+            <Select options={opts(DECISION_LABEL)} />
+          </Form.Item>
+          <Form.Item name="disposition" label="处置" rules={[{ required: true }]}>
+            <Select options={opts(DISPOSITION_LABEL)} />
+          </Form.Item>
+          <Form.Item name="binding_class" label="绑定" rules={[{ required: true }]}>
+            <Select options={opts(BINDING_LABEL)} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  );
 }
 
 function DocExpand({ docId }: { docId: number }) {
