@@ -100,7 +100,7 @@ function ClauseList({ docId }: { docId: number }) {
       <Modal
         title="编辑条款" open={!!editing} okText="保存" cancelText="取消"
         confirmLoading={updateMut.isPending}
-        onOk={() => form.submit()} onCancel={() => setEditing(null)} destroyOnClose
+        onOk={() => form.submit()} onCancel={() => setEditing(null)} destroyOnHidden
       >
         <Form form={form} layout="vertical"
           onFinish={(v) => updateMut.mutate({ clause_no: v.clause_no, clause_text: v.clause_text || null })}>
@@ -211,7 +211,7 @@ function RuleList({ docId }: { docId: number }) {
       <Modal
         title="编辑规则" open={!!editing} okText="保存" cancelText="取消"
         confirmLoading={updateMut.isPending}
-        onOk={() => form.submit()} onCancel={() => setEditing(null)} destroyOnClose
+        onOk={() => form.submit()} onCancel={() => setEditing(null)} destroyOnHidden
       >
         <Form form={form} layout="vertical"
           onFinish={(v) => updateMut.mutate({
