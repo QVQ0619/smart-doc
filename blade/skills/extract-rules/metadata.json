@@ -1,0 +1,8 @@
+{
+  "latest": "1.0.0",
+  "release": "1.0.0",
+  "versions": [
+    { "version": "1.0.0", "created_at": "2026-06-24T00:00:00+00:00", "changelog": "初版：一步从已识别文档抽取依据条款+审查规则，helper 走 shared/helpers。" }
+  ],
+  "forked_from": null
+}

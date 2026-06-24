@@ -1,10 +1,10 @@
 import { toast } from "sonner";
 import { partnerSkillApi } from "@blade-hq/agent-kit/react";
-import SKILL_MD from "../../blade/skills/save-rule-doc/SKILL.md?raw";
-import SHIM_PY from "../../backend/agent_shim/smart_doc_add.py?raw";
-import EXTRACT_RULES_SKILL_MD from "../../blade/skills/extract-rules/SKILL.md?raw";
-import SEGMENTS_PY from "../../backend/agent_shim/smart_doc_segments.py?raw";
-import EXTRACT_RULES_PY from "../../backend/agent_shim/smart_doc_extract_rules.py?raw";
+import SKILL_MD from "../../blade/skills/save-rule-doc/versions/1.0.0/SKILL.md?raw";
+import SHIM_PY from "../../blade/skills/shared/helpers/smart_doc_add.py?raw";
+import EXTRACT_RULES_SKILL_MD from "../../blade/skills/extract-rules/versions/1.0.0/SKILL.md?raw";
+import SEGMENTS_PY from "../../blade/skills/shared/helpers/smart_doc_segments.py?raw";
+import EXTRACT_RULES_PY from "../../blade/skills/shared/helpers/smart_doc_extract_rules.py?raw";
 
 const SAVE_SKILL_NAME = "local/save-rule-doc";
 const EXTRACT_RULES_SKILL_NAME = "local/extract-rules";

@@ -4,8 +4,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from agent_shim.smart_doc_list_clauses import main as list_main
-from agent_shim.smart_doc_rules import main as rules_main
+from smart_doc_list_clauses import main as list_main
+from smart_doc_rules import main as rules_main
 
 
 class _Handler(BaseHTTPRequestHandler):

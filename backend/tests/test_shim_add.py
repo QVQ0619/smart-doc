@@ -1,7 +1,7 @@
 import importlib.util
 import pathlib
 
-_p = pathlib.Path(__file__).resolve().parents[1] / "agent_shim" / "smart_doc_add.py"
+_p = pathlib.Path(__file__).resolve().parents[2] / "blade" / "skills" / "shared" / "helpers" / "smart_doc_add.py"
 _spec = importlib.util.spec_from_file_location("smart_doc_add", _p)
 mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(mod)

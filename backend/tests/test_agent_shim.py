@@ -4,7 +4,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from agent_shim.smart_doc_add import build_multipart, main
+from smart_doc_add import build_multipart, main
 
 
 class _Handler(BaseHTTPRequestHandler):
