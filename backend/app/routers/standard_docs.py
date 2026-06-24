@@ -1,20 +1,26 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlmodel import Session
 
 from ..auth import require_api_key
 from ..config import get_max_upload_bytes
-from ..db import get_session
+from ..db import engine, get_session
 from ..models import FileObject, StandardDoc
 from ..recognition import recognize_standard_doc
 from ..schemas import ConflictItem, FailedItem, RecognizeResult, StandardDocOut, UploadResult
 from ..storage import FileStorage, FileTooLargeError, get_storage
 
 router = APIRouter(tags=["standard_docs"])
+
+
+def _recognize_bg(doc_id: int, storage: FileStorage) -> None:
+    """后台任务：用独立 Session 跑识别（请求 Session 已随响应关闭）。"""
+    with Session(engine) as db:
+        recognize_standard_doc(db, storage, doc_id)
 
 
 def _to_out(sd: StandardDoc, fo: FileObject, *, segment_count=None, page_count=None, status=None) -> StandardDocOut:
@@ -38,6 +44,7 @@ def upload_standard_docs(
     files: list[UploadFile] = File(...),
     force: bool = False,
     replace: bool = False,
+    background: BackgroundTasks = None,  # FastAPI 自动注入
     db: Session = Depends(get_session),
     storage: FileStorage = Depends(get_storage),
     max_bytes: int = Depends(get_max_upload_bytes),
@@ -133,18 +140,12 @@ def upload_standard_docs(
             failed.append(FailedItem(name=name, reason=f"入库失败: {e}"))
             continue
 
-        rec = None
-        try:
-            rec = recognize_standard_doc(db, storage, sd.id)
-            db.refresh(sd)
-        except Exception:  # noqa: BLE001  双保险：识别异常绝不影响上传结果
-            pass
-        uploaded.append(_to_out(
-            sd, fo,
-            segment_count=rec.segment_count if rec else None,
-            page_count=rec.page_count if rec else None,
-            status="created",
-        ))
+        sd.recognition_status = "processing"
+        db.add(sd)
+        db.commit()
+        db.refresh(sd)
+        background.add_task(_recognize_bg, sd.id, storage)
+        uploaded.append(_to_out(sd, fo, segment_count=None, page_count=None, status="created"))
 
     return UploadResult(uploaded=uploaded, failed=failed, conflicts=conflicts)
 
@@ -163,13 +164,23 @@ def list_standard_docs(db: Session = Depends(get_session)) -> list[StandardDocOu
 @router.post("/standard-docs/{doc_id}/recognize", response_model=RecognizeResult, dependencies=[Depends(require_api_key)])
 def recognize_endpoint(
     doc_id: int,
+    background: BackgroundTasks,
     db: Session = Depends(get_session),
     storage: FileStorage = Depends(get_storage),
 ) -> RecognizeResult:
     sd = db.get(StandardDoc, doc_id)
     if sd is None or not sd.is_active:
         raise HTTPException(status_code=404, detail="standard_doc not found")
-    return recognize_standard_doc(db, storage, doc_id)
+    sd.recognition_status = "processing"
+    sd.recognition_error = None
+    db.add(sd)
+    db.commit()
+    db.refresh(sd)
+    background.add_task(_recognize_bg, doc_id, storage)
+    return RecognizeResult(
+        doc_id=doc_id, doc_code=sd.doc_code, recognition_status="processing",
+        segment_count=0, page_count=None, error=None,
+    )
 
 
 @router.get("/standard-docs/{doc_id}/download")

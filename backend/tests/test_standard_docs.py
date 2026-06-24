@@ -161,8 +161,11 @@ def test_upload_docx_auto_recognized(client):
     )
     assert r.status_code == 200
     doc = r.json()["uploaded"][0]
-    assert doc["recognition_status"] == "done"
-    assert doc["segment_count"] >= 2
+    # 上传立即返回 processing；TestClient 在响应前跑完 BackgroundTasks，列表已 done
+    assert doc["recognition_status"] == "processing"
+    rows = client.get("/api/standard-docs").json()
+    listed = next(d for d in rows if d["doc_code"] == doc["doc_code"])
+    assert listed["recognition_status"] == "done"
 
 
 def test_list_includes_recognition_status(client):
@@ -189,8 +192,11 @@ def test_recognize_endpoint_returns_result(client):
     assert r.status_code == 200
     body = r.json()
     assert body["doc_id"] == doc["id"]
-    assert body["recognition_status"] == "done"
-    assert body["segment_count"] >= 1
+    # 识别端点立即返回 processing；后台任务跑完后列表为 done
+    assert body["recognition_status"] == "processing"
+    rows = client.get("/api/standard-docs").json()
+    listed = next(d for d in rows if d["id"] == doc["id"])
+    assert listed["recognition_status"] == "done"
 
 
 def test_recognize_unknown_404(client):
