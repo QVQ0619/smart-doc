@@ -95,8 +95,10 @@ def get_review_input(db: Session, package_id: int) -> ReviewInput:
     pkg = db.get(ApplicationPackage, package_id)
     if pkg is None:
         raise LookupError(f"application_package {package_id} not found")
-    batch = db.get(ReviewBatch, pkg.batch_id)
-    config_id = batch.config_id if batch is not None else None
+    config_id = None
+    if pkg.batch_id is not None:
+        batch = db.get(ReviewBatch, pkg.batch_id)
+        config_id = batch.config_id if batch is not None else None
     if config_id is None:
         raise ValueError("该申报包未绑定配置包,请先 bind-config")
     rows = db.execute(

@@ -43,3 +43,12 @@ def test_review_input_unbound_422(client, monkeypatch):
 
 def test_bind_config_unknown_package_404(client):
     assert client.post("/api/packages/999999/bind-config", json={"config_doc_id": 1}).status_code == 404
+
+
+def test_review_input_excludes_soft_rules(client, monkeypatch):
+    pkg_id = _upload(client, monkeypatch)
+    with Session(engine) as db:
+        doc_id, _ = _seed_rule_doc(db, decision="soft")  # 该规则文件只含 soft 规则
+    client.post(f"/api/packages/{pkg_id}/bind-config", json={"config_doc_id": doc_id})
+    body = client.get(f"/api/packages/{pkg_id}/review-input").json()
+    assert body["rules"] == []  # soft 规则不进形式审查 hard 集
