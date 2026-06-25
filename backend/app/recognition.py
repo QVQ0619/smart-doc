@@ -117,6 +117,36 @@ def parse_image(path: Path) -> list[SegmentDraft]:
     return [SegmentDraft(1, {"page": 1, "block_index": 0, "ocr": True}, "paragraph", _clip(text))]
 
 
+def parse_file(path: Path, ext: str) -> tuple[list[SegmentDraft], str | None]:
+    """按扩展名解析为 SegmentDraft 列表。返回 (drafts, error)；error 非空表示无产出原因。"""
+    drafts: list[SegmentDraft] = []
+    error: str | None = None
+    try:
+        if not path.exists():
+            return [], "源文件缺失，无法识别"
+        if ext == ".pdf":
+            drafts = parse_pdf(path)
+            if not drafts:
+                error = ("未从 PDF 抽取到文本，可能是扫描件且 OCR 未识别出文字" if ocr.OCR_AVAILABLE
+                         else "未从 PDF 抽取到文本，疑似扫描件；未安装 OCR 组件，请 pip install rapidocr-onnxruntime pymupdf 后重试")
+        elif ext == ".docx":
+            drafts = parse_docx(path)
+            if not drafts:
+                error = "文档为空，未抽取到任何内容"
+        elif ext in IMAGE_EXTS:
+            drafts = parse_image(path)
+            if not drafts:
+                error = ("未从图片中识别到文字" if ocr.OCR_AVAILABLE
+                         else "检测到图片文件，但未安装 OCR 组件，请 pip install rapidocr-onnxruntime pymupdf 后重试")
+        else:
+            raise UnsupportedFormatError(ext or "(无扩展名)")
+    except UnsupportedFormatError as e:
+        return [], f"不支持的格式 {e.ext}，请转存为 .docx 或 PDF"
+    except Exception as e:  # noqa: BLE001
+        return [], f"识别失败：{str(e)[:300]}"
+    return drafts, error
+
+
 def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> RecognizeResult:
     sd = db.get(StandardDoc, doc_id)
     if sd is None:
@@ -125,41 +155,12 @@ def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> Re
             segment_count=0, page_count=None, error="文档记录不存在",
         )
     fo = db.get(FileObject, sd.file_id) if sd.file_id else None
-    ext = (Path(fo.file_name).suffix.lower() if fo else "")
-    status, error, drafts = "failed", None, []
-    try:
-        if fo is None:
-            error = "源文件记录缺失，无法识别"
-        else:
-            path = storage.base_dir / fo.object_key
-            if not path.exists():
-                error = "源文件缺失，无法识别"
-            elif ext == ".pdf":
-                drafts = parse_pdf(path)
-                if not drafts:
-                    if ocr.OCR_AVAILABLE:
-                        error = "未从 PDF 抽取到文本，可能是扫描件且 OCR 未识别出文字"
-                    else:
-                        error = "未从 PDF 抽取到文本，疑似扫描件；未安装 OCR 组件，请 pip install rapidocr-onnxruntime pymupdf 后重试"
-            elif ext == ".docx":
-                drafts = parse_docx(path)
-                if not drafts:
-                    error = "文档为空，未抽取到任何内容"
-            elif ext in IMAGE_EXTS:
-                drafts = parse_image(path)
-                if not drafts:
-                    if ocr.OCR_AVAILABLE:
-                        error = "未从图片中识别到文字"
-                    else:
-                        error = "检测到图片文件，但未安装 OCR 组件，请 pip install rapidocr-onnxruntime pymupdf 后重试"
-            else:
-                raise UnsupportedFormatError(ext or "(无扩展名)")
-    except UnsupportedFormatError as e:
-        error = f"不支持的格式 {e.ext}，请转存为 .docx 或 PDF"
-        drafts = []
-    except Exception as e:  # noqa: BLE001
-        error = f"识别失败：{str(e)[:300]}"
-        drafts = []
+    if fo is None:
+        drafts, error = [], "源文件记录缺失，无法识别"
+    else:
+        ext = Path(fo.file_name).suffix.lower()
+        drafts, error = parse_file(storage.base_dir / fo.object_key, ext)
+    status = "failed"
 
     if drafts and error is None:
         db.execute(delete(ParseSegment).where(ParseSegment.standard_doc_id == doc_id))
@@ -191,11 +192,59 @@ def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> Re
     )
 
 
+def recognize_material_file(db: Session, storage: FileStorage, material_file_id: int) -> "MaterialRecognizeResult":
+    from .models import MaterialFile
+    from .schemas import MaterialRecognizeResult
+
+    mf = db.get(MaterialFile, material_file_id)
+    if mf is None:
+        return MaterialRecognizeResult(material_file_id=material_file_id, recognition_status="failed",
+                                       segment_count=0, page_count=None, error="材料记录不存在")
+    fo = db.get(FileObject, mf.file_id) if mf.file_id else None
+    if fo is None:
+        drafts, error = [], "源文件记录缺失，无法识别"
+    else:
+        ext = Path(fo.file_name).suffix.lower()
+        drafts, error = parse_file(storage.base_dir / fo.object_key, ext)
+
+    if drafts and error is None:
+        db.execute(delete(ParseSegment).where(ParseSegment.material_file_id == material_file_id))
+        for d in drafts:
+            db.add(ParseSegment(
+                material_file_id=material_file_id, standard_doc_id=None,
+                page_no=d.page_no, locator=d.locator,
+                segment_type=_SEGMENT_TYPE_MAP.get(d.segment_type, d.segment_type),
+                content_text=d.content_text,
+            ))
+        status, segment_count = "done", len(drafts)
+        pages = {d.page_no for d in drafts if d.page_no is not None}
+        page_count = max(pages) if pages else None
+    else:
+        status, segment_count, page_count = "failed", 0, None
+        if error is None:
+            error = "识别失败：未产出任何片段"
+
+    mf.recognition_status = status
+    mf.recognition_error = error if status == "failed" else None
+    db.add(mf)
+    db.commit()
+    return MaterialRecognizeResult(
+        material_file_id=material_file_id, recognition_status=status,
+        segment_count=segment_count, page_count=page_count,
+        error=error if status == "failed" else None,
+    )
+
+
 def reset_stuck_processing(db: Session) -> int:
     """应用启动时把残留 processing(进程内后台任务因重启中断) 重置为 pending。"""
     rows = db.execute(select(StandardDoc).where(StandardDoc.recognition_status == "processing")).scalars().all()
     for sd in rows:
         sd.recognition_status = "pending"
         db.add(sd)
+    from .models import MaterialFile
+    mrows = db.execute(select(MaterialFile).where(MaterialFile.recognition_status == "processing")).scalars().all()
+    for mf in mrows:
+        mf.recognition_status = "pending"
+        db.add(mf)
     db.commit()
-    return len(rows)
+    return len(rows) + len(mrows)

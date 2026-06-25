@@ -160,3 +160,11 @@ class ConfigPackageOut(BaseModel):
     version: str
     rule_count: int
     dimensions: list[str]
+
+
+class MaterialRecognizeResult(BaseModel):
+    material_file_id: int
+    recognition_status: str          # processing | done | failed
+    segment_count: int
+    page_count: Optional[int] = None
+    error: Optional[str] = None
