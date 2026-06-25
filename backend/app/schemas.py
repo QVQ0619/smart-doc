@@ -318,3 +318,27 @@ class BindConfigIn(BaseModel):
 class BindConfigResult(BaseModel):
     config_id: int
     rule_count: int
+
+
+class ReviewRuleInfo(BaseModel):
+    rule_version_id: int
+    rule_code: str
+    name: str
+    logic: Optional[str]
+    dimension_code: str
+    dimension_name: str
+    disposition: str
+    clause_no: Optional[str]
+    clause_text: Optional[str]
+
+
+class ReviewInput(BaseModel):
+    config_id: int
+    package_id: int
+    rules: list[ReviewRuleInfo]
+    members: list[MemberOut]
+    coop_units: list[CoopUnitOut]
+    budget_items: list[BudgetItemOut]
+    attachments: list[AttachmentOut]
+    fields: list[FieldOut]
+    segments: list[MaterialFileSegmentsOut]

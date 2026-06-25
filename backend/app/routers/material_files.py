@@ -129,17 +129,8 @@ def recognize_material_endpoint(material_file_id: int, background: BackgroundTas
 def list_package_segments(package_id: int, db: Session = Depends(get_session)) -> list[MaterialFileSegmentsOut]:
     if db.get(ApplicationPackage, package_id) is None:
         raise HTTPException(status_code=404, detail="application_package not found")
-    mfs = db.execute(select(MaterialFile).where(MaterialFile.package_id == package_id)
-                     .order_by(MaterialFile.id)).scalars().all()
-    out: list[MaterialFileSegmentsOut] = []
-    for mf in mfs:
-        segs = db.execute(select(ParseSegment).where(ParseSegment.material_file_id == mf.id)
-                          .order_by(ParseSegment.id)).scalars().all()
-        out.append(MaterialFileSegmentsOut(
-            material_file_id=mf.id, file_name=mf.file_name,
-            segments=[SegmentOut(id=s.id, page_no=s.page_no, locator=s.locator,
-                                 segment_type=s.segment_type, content_text=s.content_text) for s in segs]))
-    return out
+    from ..material_extraction import build_package_segments
+    return build_package_segments(db, package_id)
 
 
 @router.post("/packages/{package_id}/extract", response_model=MaterialExtractResult,
@@ -158,28 +149,5 @@ def extract_package(package_id: int, body: MaterialExtractPayload,
 def get_package_structured(package_id: int, db: Session = Depends(get_session)) -> PackageStructuredOut:
     if db.get(ApplicationPackage, package_id) is None:
         raise HTTPException(status_code=404, detail="application_package not found")
-
-    def _all(model):
-        return db.execute(select(model).where(model.package_id == package_id)
-                          .order_by(model.id)).scalars().all()
-
-    return PackageStructuredOut(
-        package_id=package_id,
-        members=[MemberOut(id=m.id, member_role=m.member_role, name=m.name, title=m.title,
-                           unit_name=m.unit_name, source_segment_id=m.source_segment_id)
-                 for m in _all(PackageMember)],
-        coop_units=[CoopUnitOut(id=c.id, coop_type=c.coop_type, unit_name=c.unit_name,
-                                task_desc=c.task_desc,
-                                applied_fund=(float(c.applied_fund) if c.applied_fund is not None else None),
-                                source_segment_id=c.source_segment_id)
-                    for c in _all(PackageCoopUnit)],
-        budget_items=[BudgetItemOut(id=b.id, category=b.category, item_name=b.item_name,
-                                    amount=float(b.amount), source_segment_id=b.source_segment_id)
-                      for b in _all(BudgetItem)],
-        attachments=[AttachmentOut(id=a.id, attachment_type=a.attachment_type,
-                                   is_present=a.is_present, source_segment_id=a.source_segment_id)
-                     for a in _all(PackageAttachment)],
-        fields=[FieldOut(id=f.id, field_code=f.field_code_snapshot, field_value=f.field_value,
-                         extraction_status=f.extraction_status, source_segment_id=f.source_segment_id)
-                for f in _all(ExtractedField)],
-    )
+    from ..material_extraction import build_package_structured
+    return build_package_structured(db, package_id)

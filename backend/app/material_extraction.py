@@ -10,7 +10,9 @@ from .materials import ensure_default_form_template
 from .models import (ApplicationPackage, BudgetItem, DeclaredProject, ExtractedField,
                      FormField, MaterialFile, PackageAttachment, PackageCoopUnit,
                      PackageMember, ParseSegment)
-from .schemas import MaterialExtractPayload, MaterialExtractResult
+from .schemas import (AttachmentOut, BudgetItemOut, CoopUnitOut, FieldOut,
+                      MaterialExtractPayload, MaterialExtractResult, MaterialFileSegmentsOut,
+                      MemberOut, PackageStructuredOut, SegmentOut)
 
 _MEMBER_ROLE = {"applicant", "participant"}
 _COOP_TYPE = {"联合承研", "合作单位"}
@@ -125,3 +127,45 @@ def replace_package_extraction(db: Session, package_id: int,
         budget_items=len(payload.budget_items), attachments=len(payload.attachments),
         fields=len(payload.fields) - skipped_fields, skipped_fields=skipped_fields,
     )
+
+
+def build_package_structured(db: Session, package_id: int) -> PackageStructuredOut:
+    """组装该包五类结构化只读视图(供 /structured 端点与 C review-input 共用)。"""
+    def _all(model):
+        return db.execute(select(model).where(model.package_id == package_id)
+                          .order_by(model.id)).scalars().all()
+    return PackageStructuredOut(
+        package_id=package_id,
+        members=[MemberOut(id=m.id, member_role=m.member_role, name=m.name, title=m.title,
+                           unit_name=m.unit_name, source_segment_id=m.source_segment_id)
+                 for m in _all(PackageMember)],
+        coop_units=[CoopUnitOut(id=c.id, coop_type=c.coop_type, unit_name=c.unit_name,
+                                task_desc=c.task_desc,
+                                applied_fund=(float(c.applied_fund) if c.applied_fund is not None else None),
+                                source_segment_id=c.source_segment_id)
+                    for c in _all(PackageCoopUnit)],
+        budget_items=[BudgetItemOut(id=b.id, category=b.category, item_name=b.item_name,
+                                    amount=float(b.amount), source_segment_id=b.source_segment_id)
+                      for b in _all(BudgetItem)],
+        attachments=[AttachmentOut(id=a.id, attachment_type=a.attachment_type,
+                                   is_present=a.is_present, source_segment_id=a.source_segment_id)
+                     for a in _all(PackageAttachment)],
+        fields=[FieldOut(id=f.id, field_code=f.field_code_snapshot, field_value=f.field_value,
+                         extraction_status=f.extraction_status, source_segment_id=f.source_segment_id)
+                for f in _all(ExtractedField)],
+    )
+
+
+def build_package_segments(db: Session, package_id: int) -> list[MaterialFileSegmentsOut]:
+    """聚合该包所有 material_file 的 parse_segment(供 /packages/{id}/segments 与 C review-input 共用)。"""
+    mfs = db.execute(select(MaterialFile).where(MaterialFile.package_id == package_id)
+                     .order_by(MaterialFile.id)).scalars().all()
+    out: list[MaterialFileSegmentsOut] = []
+    for mf in mfs:
+        segs = db.execute(select(ParseSegment).where(ParseSegment.material_file_id == mf.id)
+                          .order_by(ParseSegment.id)).scalars().all()
+        out.append(MaterialFileSegmentsOut(
+            material_file_id=mf.id, file_name=mf.file_name,
+            segments=[SegmentOut(id=s.id, page_no=s.page_no, locator=s.locator,
+                                 segment_type=s.segment_type, content_text=s.content_text) for s in segs]))
+    return out

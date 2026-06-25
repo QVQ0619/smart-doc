@@ -3,10 +3,12 @@ from __future__ import annotations
 from sqlalchemy import delete, func, insert, null, select
 from sqlmodel import Session
 
+from .material_extraction import build_package_segments, build_package_structured
 from .materials import ensure_default_master_data
 from .models import (ApplicationPackage, ConfigPackage, ConfigRuleVersion, RegulationClause,
                      ReviewBatch, ReviewDimension, ReviewRule, ReviewRuleClause,
                      ReviewRuleVersion, StandardDoc)
+from .schemas import ReviewInput, ReviewRuleInfo
 
 
 class ConflictError(Exception):
@@ -85,3 +87,44 @@ def bind_package_config(db: Session, package_id: int, config_doc_id: int) -> tup
     db.commit()
     rule_count = len(_hard_rule_version_ids(db, config_id))
     return config_id, rule_count
+
+
+def get_review_input(db: Session, package_id: int) -> ReviewInput:
+    """组装 agent 判定输入:该包 config 下 hard 规则 + 结构化数据 + 段落。
+    包不存在 → LookupError;未绑 config → ValueError。"""
+    pkg = db.get(ApplicationPackage, package_id)
+    if pkg is None:
+        raise LookupError(f"application_package {package_id} not found")
+    batch = db.get(ReviewBatch, pkg.batch_id)
+    config_id = batch.config_id if batch is not None else None
+    if config_id is None:
+        raise ValueError("该申报包未绑定配置包,请先 bind-config")
+    rows = db.execute(
+        select(ReviewRuleVersion, ReviewRule, ReviewDimension)
+        .join(ConfigRuleVersion, ConfigRuleVersion.rule_version_id == ReviewRuleVersion.id)
+        .join(ReviewRule, ReviewRule.current_version_id == ReviewRuleVersion.id)
+        .join(ReviewDimension, ReviewDimension.id == ReviewRuleVersion.dimension_id)
+        .where(ConfigRuleVersion.config_id == config_id,
+               ReviewRuleVersion.decision_type == "hard",
+               ReviewRule.is_active == True)  # noqa: E712
+        .order_by(ReviewRuleVersion.id)
+    ).all()
+    rules: list[ReviewRuleInfo] = []
+    for rv, rule, dim in rows:
+        clause = db.execute(
+            select(RegulationClause)
+            .join(ReviewRuleClause, ReviewRuleClause.clause_id == RegulationClause.id)
+            .where(ReviewRuleClause.rule_version_id == rv.id)
+            .order_by(RegulationClause.id)
+        ).scalars().first()
+        rules.append(ReviewRuleInfo(
+            rule_version_id=rv.id, rule_code=rule.rule_code, name=rv.name, logic=rv.logic,
+            dimension_code=dim.code, dimension_name=dim.name, disposition=rv.disposition,
+            clause_no=(clause.clause_no if clause else None),
+            clause_text=(clause.clause_text if clause else None)))
+    structured = build_package_structured(db, package_id)
+    return ReviewInput(
+        config_id=config_id, package_id=package_id, rules=rules,
+        members=structured.members, coop_units=structured.coop_units,
+        budget_items=structured.budget_items, attachments=structured.attachments,
+        fields=structured.fields, segments=build_package_segments(db, package_id))
