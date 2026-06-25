@@ -168,3 +168,28 @@ class MaterialRecognizeResult(BaseModel):
     segment_count: int
     page_count: Optional[int] = None
     error: Optional[str] = None
+
+
+class MaterialItemOut(BaseModel):
+    material_file_id: int
+    file_name: str
+    material_category: str
+    recognition_status: str
+
+class MaterialUploadResult(BaseModel):
+    package_id: int
+    items: list[MaterialItemOut]
+    failed: list[FailedItem] = []
+
+class MaterialFileBrief(BaseModel):
+    material_file_id: int
+    file_name: str
+    material_category: str
+    recognition_status: str
+    segment_count: int
+
+class MaterialPackageOut(BaseModel):
+    package_id: int
+    created_at: Optional[datetime] = None
+    file_count: int
+    files: list[MaterialFileBrief]

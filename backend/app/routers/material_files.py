@@ -1,0 +1,120 @@
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy import func, select
+from sqlmodel import Session
+
+from ..auth import require_api_key
+from ..config import get_max_upload_bytes
+from ..db import engine, get_session
+from ..materials import create_review_package
+from ..models import ApplicationPackage, FileObject, MaterialFile, ParseSegment
+from ..materials import ensure_default_master_data
+from ..recognition import recognize_material_file
+from ..schemas import (FailedItem, MaterialFileBrief, MaterialItemOut, MaterialPackageOut,
+                       MaterialRecognizeResult, MaterialUploadResult, SegmentOut)
+from ..storage import FileStorage, FileTooLargeError, get_storage
+
+router = APIRouter(tags=["material_files"])
+
+
+def _recognize_bg(material_file_id: int, storage: FileStorage) -> None:
+    with Session(engine) as db:
+        recognize_material_file(db, storage, material_file_id)
+
+
+@router.post("/material-files", response_model=MaterialUploadResult,
+             dependencies=[Depends(require_api_key)])
+def upload_material_files(
+    files: list[UploadFile] = File(...),
+    package_id: int | None = Form(default=None),
+    material_category: str = Form(default="application_form"),  # chk_mf_cat 白名单: application_form/budget/cv/research_plan/attachment
+    background: BackgroundTasks = None,
+    db: Session = Depends(get_session),
+    storage: FileStorage = Depends(get_storage),
+    max_bytes: int = Depends(get_max_upload_bytes),
+) -> MaterialUploadResult:
+    if package_id is not None:
+        pkg = db.get(ApplicationPackage, package_id)
+        if pkg is None:
+            raise HTTPException(status_code=404, detail="application_package not found")
+    else:
+        package_id = create_review_package(db)
+
+    secrecy_id = ensure_default_master_data(db).secrecy_level_id
+    items: list[MaterialItemOut] = []
+    failed: list[FailedItem] = []
+    for up in files:
+        name = up.filename or "unnamed"
+        try:
+            blob = storage.save("material", name, up.file, max_bytes)
+        except FileTooLargeError as e:
+            failed.append(FailedItem(name=name, reason=f"超过 {e.limit_bytes} 字节上限"))
+            continue
+        except Exception as e:  # noqa: BLE001
+            failed.append(FailedItem(name=name, reason=f"落盘失败: {e}"))
+            continue
+        try:
+            fo = FileObject(bucket="local", object_key=blob.object_key, file_name=name,
+                            mime_type=up.content_type, size_bytes=blob.size_bytes,
+                            content_hash=blob.sha256, sensitivity="内部")
+            db.add(fo); db.flush()
+            ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+            mf = MaterialFile(package_id=package_id, round_no=1, material_category=material_category,
+                              file_name=name, file_format=ext, file_id=fo.id,
+                              secrecy_level_id=secrecy_id, recognition_status="processing")
+            db.add(mf); db.commit(); db.refresh(mf)
+        except Exception as e:  # noqa: BLE001
+            db.rollback()
+            storage.delete(blob.object_key)
+            failed.append(FailedItem(name=name, reason=f"入库失败: {e}"))
+            continue
+        background.add_task(_recognize_bg, mf.id, storage)
+        items.append(MaterialItemOut(material_file_id=mf.id, file_name=name,
+                                     material_category=material_category,
+                                     recognition_status="processing"))
+    return MaterialUploadResult(package_id=package_id, items=items, failed=failed)
+
+
+@router.get("/material-packages", response_model=list[MaterialPackageOut])
+def list_material_packages(db: Session = Depends(get_session)) -> list[MaterialPackageOut]:
+    pkgs = db.execute(select(ApplicationPackage).order_by(ApplicationPackage.id.desc())).scalars().all()
+    out: list[MaterialPackageOut] = []
+    for pkg in pkgs:
+        mfs = db.execute(select(MaterialFile).where(MaterialFile.package_id == pkg.id)
+                         .order_by(MaterialFile.id)).scalars().all()
+        if not mfs:
+            continue  # 只列有材料的包
+        briefs: list[MaterialFileBrief] = []
+        for mf in mfs:
+            seg_count = db.execute(select(func.count()).select_from(ParseSegment)
+                                   .where(ParseSegment.material_file_id == mf.id)).scalar_one()
+            briefs.append(MaterialFileBrief(
+                material_file_id=mf.id, file_name=mf.file_name,
+                material_category=mf.material_category,
+                recognition_status=mf.recognition_status, segment_count=seg_count))
+        out.append(MaterialPackageOut(package_id=pkg.id, created_at=pkg.created_at,
+                                      file_count=len(briefs), files=briefs))
+    return out
+
+
+@router.get("/material-files/{material_file_id}/segments", response_model=list[SegmentOut])
+def list_material_segments(material_file_id: int, db: Session = Depends(get_session)) -> list[SegmentOut]:
+    rows = db.execute(select(ParseSegment).where(ParseSegment.material_file_id == material_file_id)
+                      .order_by(ParseSegment.id)).scalars().all()
+    return [SegmentOut(id=s.id, page_no=s.page_no, locator=s.locator,
+                       segment_type=s.segment_type, content_text=s.content_text) for s in rows]
+
+
+@router.post("/material-files/{material_file_id}/recognize", response_model=MaterialRecognizeResult,
+             dependencies=[Depends(require_api_key)])
+def recognize_material_endpoint(material_file_id: int, background: BackgroundTasks,
+                                db: Session = Depends(get_session),
+                                storage: FileStorage = Depends(get_storage)) -> MaterialRecognizeResult:
+    mf = db.get(MaterialFile, material_file_id)
+    if mf is None:
+        raise HTTPException(status_code=404, detail="material_file not found")
+    mf.recognition_status = "processing"
+    mf.recognition_error = None
+    db.add(mf); db.commit()
+    background.add_task(_recognize_bg, material_file_id, storage)
+    return MaterialRecognizeResult(material_file_id=material_file_id, recognition_status="processing",
+                                   segment_count=0, page_count=None, error=None)
