@@ -65,6 +65,13 @@ def client(_test_db, storage_dir):
 
     # 清理本期涉及的表（外键约束顺序：先断循环引用，再逐层删子表）
     with Session(engine) as s:
+        s.execute(text("DELETE FROM extracted_field"))
+        s.execute(text("DELETE FROM package_member"))
+        s.execute(text("DELETE FROM package_coop_unit"))
+        s.execute(text("DELETE FROM budget_item"))   # 扁平无自引用，整表删安全
+        s.execute(text("DELETE FROM package_attachment"))
+        s.execute(text("DELETE FROM form_field"))
+        s.execute(text("DELETE FROM form_template"))
         s.execute(text("DELETE FROM review_rule_clause"))
         s.execute(text("UPDATE review_rule SET current_version_id=NULL"))
         s.execute(text("DELETE FROM review_rule_version"))

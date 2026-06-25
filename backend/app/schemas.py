@@ -196,3 +196,115 @@ class MaterialPackageOut(BaseModel):
     created_at: Optional[datetime] = None
     file_count: int
     files: list[MaterialFileBrief]
+
+
+# —— 形式审查·结构化抽取 ——
+class MemberIn(BaseModel):
+    member_role: str
+    name: str
+    title: Optional[str] = None
+    birth_date: Optional[str] = None          # ISO 日期串
+    unit_name: Optional[str] = None
+    source_segment_id: Optional[int] = None
+
+
+class CoopUnitIn(BaseModel):
+    coop_type: str
+    unit_name: str
+    task_desc: Optional[str] = None
+    applied_fund: Optional[float] = None
+    source_segment_id: Optional[int] = None
+
+
+class BudgetItemIn(BaseModel):
+    category: str
+    item_name: str
+    amount: float
+    source_segment_id: Optional[int] = None
+
+
+class AttachmentIn(BaseModel):
+    attachment_type: str
+    is_present: bool = False
+    source_segment_id: Optional[int] = None
+
+
+class FieldIn(BaseModel):
+    field_code: str
+    field_value: Optional[str] = None
+    extraction_status: Optional[str] = None
+    source_segment_id: Optional[int] = None
+
+
+class MaterialExtractPayload(BaseModel):
+    project_name: Optional[str] = None
+    members: list[MemberIn] = []
+    coop_units: list[CoopUnitIn] = []
+    budget_items: list[BudgetItemIn] = []
+    attachments: list[AttachmentIn] = []
+    fields: list[FieldIn] = []
+
+
+class MaterialExtractResult(BaseModel):
+    members: int
+    coop_units: int
+    budget_items: int
+    attachments: int
+    fields: int
+    skipped_fields: int
+
+
+class MemberOut(BaseModel):
+    id: int
+    member_role: str
+    name: str
+    title: Optional[str]
+    unit_name: Optional[str]
+    source_segment_id: Optional[int]
+
+
+class CoopUnitOut(BaseModel):
+    id: int
+    coop_type: str
+    unit_name: str
+    task_desc: Optional[str]
+    applied_fund: Optional[float]
+    source_segment_id: Optional[int]
+
+
+class BudgetItemOut(BaseModel):
+    id: int
+    category: str
+    item_name: str
+    amount: float
+    source_segment_id: Optional[int]
+
+
+class AttachmentOut(BaseModel):
+    id: int
+    attachment_type: str
+    is_present: bool
+    source_segment_id: Optional[int]
+
+
+class FieldOut(BaseModel):
+    id: int
+    field_code: str
+    field_value: Optional[str]
+    extraction_status: str
+    source_segment_id: Optional[int]
+
+
+class PackageStructuredOut(BaseModel):
+    package_id: int
+    members: list[MemberOut]
+    coop_units: list[CoopUnitOut]
+    budget_items: list[BudgetItemOut]
+    attachments: list[AttachmentOut]
+    fields: list[FieldOut]
+
+
+class MaterialFileSegmentsOut(BaseModel):
+    material_file_id: int
+    file_name: str
+    segments: list[SegmentOut]
