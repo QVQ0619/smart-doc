@@ -11,14 +11,16 @@ vi.mock("../../components/ConfigPackageLibrary", () => ({
   default: () => <div data-testid="config-pkg-lib" />,
 }));
 
+vi.mock("../../components/MaterialLibrary", () => ({ default: () => <div data-testid="material-lib" /> }));
+
 test("规则库页渲染 StandardDocLibrary", () => {
   render(<RuleLibraryPage />);
   expect(screen.getByTestId("std-doc-lib")).toBeInTheDocument();
 });
 
-test("审查文档库页显示申请材料待接入说明", () => {
+test("审查文档库页渲染 MaterialLibrary", () => {
   render(<DocArchivePage />);
-  expect(screen.getByText(/申报批次/)).toBeInTheDocument();
+  expect(screen.getByTestId("material-lib")).toBeInTheDocument();
 });
 
 test("配置包页渲染 ConfigPackageLibrary", () => {
