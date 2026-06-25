@@ -308,3 +308,13 @@ class MaterialFileSegmentsOut(BaseModel):
     material_file_id: int
     file_name: str
     segments: list[SegmentOut]
+
+
+# —— 形式审查·审查执行(C) ——
+class BindConfigIn(BaseModel):
+    config_doc_id: int
+
+
+class BindConfigResult(BaseModel):
+    config_id: int
+    rule_count: int
