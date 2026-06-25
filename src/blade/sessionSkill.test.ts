@@ -72,14 +72,9 @@ test("uploadSessionSkill reject → 不抛 + toast.warning", async () => {
 test("pushMaterialDocSkill 推送 save-material-doc 与 extract-material-structure", async () => {
   vi.stubEnv("VITE_SMART_DOC_API", "https://t.example.com");
   vi.stubEnv("VITE_SMART_DOC_API_KEY", "k-secret");
-  const spy = vi
-    .spyOn({ uploadSessionSkill }, "uploadSessionSkill")
-    .mockResolvedValue({ skill_dir: "/x", file_count: 1 } as never);
-  // 重置并直接复用顶层 mock
   uploadSessionSkill.mockReset().mockResolvedValue({ skill_dir: "/x", file_count: 1 } as never);
   await pushMaterialDocSkill("sess-1");
   const names = uploadSessionSkill.mock.calls.map((c) => (c[1] as { name: string }).name);
   expect(names).toContain("local/save-material-doc");
   expect(names).toContain("local/extract-material-structure");
-  spy.mockRestore();
 });

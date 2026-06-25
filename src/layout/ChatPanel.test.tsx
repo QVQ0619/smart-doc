@@ -36,7 +36,7 @@ vi.mock("../blade/sessionSkill", () => ({
 }));
 
 import ChatPanel from "./ChatPanel";
-import { pushRuleDocSkill } from "../blade/sessionSkill";
+import { pushRuleDocSkill, pushMaterialDocSkill } from "../blade/sessionSkill";
 
 beforeEach(() => {
   createSession.mockClear();
@@ -79,11 +79,12 @@ test("点击折叠按钮切换折叠态", async () => {
   expect(screen.getByTestId("chatview")).toBeInTheDocument();
 });
 
-test("建会话成功后推送 save-rule-doc 技能", async () => {
+test("建会话成功后推送 save-rule-doc 与 save-material-doc 技能", async () => {
   hasToken.mockReturnValue(true);
   render(<ChatPanel />);
   await waitFor(() => expect(screen.getByTestId("chatview")).toBeInTheDocument());
   await waitFor(() =>
     expect(vi.mocked(pushRuleDocSkill)).toHaveBeenCalledWith("s-123"),
   );
+  expect(vi.mocked(pushMaterialDocSkill)).toHaveBeenCalledWith("s-123");
 });
