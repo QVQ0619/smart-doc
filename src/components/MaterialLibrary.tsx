@@ -44,7 +44,7 @@ const FILE_COLS: ColumnsType<MaterialFileBrief> = [
   { title: "类别", key: "material_category", width: 120,
     render: (_: unknown, f) => CATEGORY_LABEL[f.material_category] ?? f.material_category },
   { title: "识别状态", key: "status", width: 110,
-    render: (_: unknown, f) => <Tag color={STATUS_COLOR[f.recognition_status]}>
+    render: (_: unknown, f) => <Tag color={STATUS_COLOR[f.recognition_status] ?? "default"}>
       {STATUS_LABEL[f.recognition_status] ?? f.recognition_status}</Tag> },
   { title: "段落数", dataIndex: "segment_count", key: "segment_count", width: 90 },
 ];

@@ -13,7 +13,7 @@ describe("MaterialLibrary", () => {
   it("渲染审查包列表", async () => {
     vi.spyOn(api, "listMaterialPackages").mockResolvedValue([
       { package_id: 3, created_at: null, file_count: 1,
-        files: [{ material_file_id: 9, file_name: "申请书.docx", material_category: "申请书",
+        files: [{ material_file_id: 9, file_name: "申请书.docx", material_category: "application_form",
                   recognition_status: "done", segment_count: 5 }] }]);
     renderWithQuery(<MaterialLibrary />);
     await waitFor(() => expect(screen.getByText("审查包 #3")).toBeInTheDocument());
