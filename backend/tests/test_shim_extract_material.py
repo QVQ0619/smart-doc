@@ -18,11 +18,16 @@ def test_extract_missing_file(tmp_path, monkeypatch):
     assert extract.main(["smart_doc_extract.py", "5", str(tmp_path / "nope.json")]) == 2
 
 
-def test_extract_missing_api(monkeypatch):
+def test_extract_missing_api(tmp_path, monkeypatch):
     monkeypatch.delenv("SMART_DOC_API", raising=False)
-    assert extract.main(["smart_doc_extract.py", "5", "whatever.json"]) == 6
+    f = tmp_path / "payload.json"; f.write_text("{}", encoding="utf-8")
+    assert extract.main(["smart_doc_extract.py", "5", str(f)]) == 6
 
 
 def test_segments_missing_api(monkeypatch):
     monkeypatch.delenv("SMART_DOC_API", raising=False)
     assert segs.main(["smart_doc_pkg_segments.py", "5"]) == 6
+
+
+def test_segments_usage_error():
+    assert segs.main(["smart_doc_pkg_segments.py"]) == 1  # 缺 package_id

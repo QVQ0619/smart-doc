@@ -12,9 +12,9 @@ from pathlib import Path
 
 
 def format_result(r: dict) -> str:
-    return (f"members={r.get('members')} coop_units={r.get('coop_units')} "
-            f"budget_items={r.get('budget_items')} attachments={r.get('attachments')} "
-            f"fields={r.get('fields')} skipped_fields={r.get('skipped_fields')}")
+    return (f"members={r.get('members', 0)} coop_units={r.get('coop_units', 0)} "
+            f"budget_items={r.get('budget_items', 0)} attachments={r.get('attachments', 0)} "
+            f"fields={r.get('fields', 0)} skipped_fields={r.get('skipped_fields', 0)}")
 
 
 def main(argv: list[str]) -> int:
