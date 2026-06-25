@@ -5,9 +5,8 @@ from sqlmodel import Session
 from ..auth import require_api_key
 from ..config import get_max_upload_bytes
 from ..db import engine, get_session
-from ..materials import create_review_package
+from ..materials import create_review_package, ensure_default_master_data
 from ..models import ApplicationPackage, FileObject, MaterialFile, ParseSegment
-from ..materials import ensure_default_master_data
 from ..recognition import recognize_material_file
 from ..schemas import (FailedItem, MaterialFileBrief, MaterialItemOut, MaterialPackageOut,
                        MaterialRecognizeResult, MaterialUploadResult, SegmentOut)

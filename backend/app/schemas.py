@@ -176,10 +176,12 @@ class MaterialItemOut(BaseModel):
     material_category: str
     recognition_status: str
 
+
 class MaterialUploadResult(BaseModel):
     package_id: int
     items: list[MaterialItemOut]
     failed: list[FailedItem] = []
+
 
 class MaterialFileBrief(BaseModel):
     material_file_id: int
@@ -187,6 +189,7 @@ class MaterialFileBrief(BaseModel):
     material_category: str
     recognition_status: str
     segment_count: int
+
 
 class MaterialPackageOut(BaseModel):
     package_id: int

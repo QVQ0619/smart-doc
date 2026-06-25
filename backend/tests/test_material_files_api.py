@@ -56,3 +56,8 @@ def test_material_packages_aggregates_counts(client, monkeypatch):
     assert me["file_count"] == 1
     assert me["files"][0]["segment_count"] == 2
     assert me["files"][0]["recognition_status"] == "done"
+
+
+def test_recognize_unknown_material_404(client):
+    r = client.post("/api/material-files/999999/recognize")
+    assert r.status_code == 404
