@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import MaterialLibrary from "./MaterialLibrary";
@@ -38,7 +38,8 @@ describe("MaterialLibrary", () => {
     await waitFor(() => expect(screen.getByText("审查包 #3")).toBeInTheDocument());
     // 展开包行
     const expandBtn = container.querySelector(".ant-table-row-expand-icon") as HTMLElement;
-    expandBtn?.click();
+    expect(expandBtn).toBeTruthy();
+    expandBtn.click();
     await waitFor(() => expect(screen.getByText("张三")).toBeInTheDocument());
   });
 });

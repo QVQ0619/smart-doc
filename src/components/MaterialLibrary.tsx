@@ -1,9 +1,8 @@
-﻿import { Table, Tag, Tabs } from "antd";
+import { Table, Tag, Tabs } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useQuery } from "@tanstack/react-query";
 import { listMaterialPackages, listMaterialSegments, getPackageStructured,
-         type MaterialPackage, type MaterialFileBrief, type MaterialSegment,
-         type PackageStructured } from "../api/materials";
+         type MaterialPackage, type MaterialFileBrief, type MaterialSegment } from "../api/materials";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "待识别", processing: "识别中", done: "已识别", failed: "识别失败",
@@ -91,7 +90,7 @@ function PackageStructuredView({ packageId }: { packageId: number }) {
                        queryFn: () => getPackageStructured(packageId) });
   if (q.isLoading) return <span>加载中…</span>;
   if (q.isError) return <span>结构化数据加载失败</span>;
-  const d = q.data as PackageStructured | undefined;
+  const d = q.data;
   if (!d) return <span>尚未结构化抽取</span>;
   const empty = !d.members.length && !d.coop_units.length && !d.budget_items.length
     && !d.attachments.length && !d.fields.length;
@@ -104,7 +103,7 @@ function PackageStructuredView({ packageId }: { packageId: number }) {
       { key: "c", label: `合作单位(${d.coop_units.length})`, children: t(d.coop_units, COOP_COLS) },
       { key: "b", label: `预算(${d.budget_items.length})`, children: t(d.budget_items, BUDGET_COLS) },
       { key: "a", label: `附件(${d.attachments.length})`, children: t(d.attachments, ATTACH_COLS) },
-      { key: "f", label: `字段(${d.fields.length})`, children: t(d.fields, FIELD_COLS) },
+      { key: "f", label: `标量字段(${d.fields.length})`, children: t(d.fields, FIELD_COLS) },
     ]} />
   );
 }

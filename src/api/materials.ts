@@ -1,4 +1,4 @@
-﻿export interface MaterialFileBrief {
+export interface MaterialFileBrief {
   material_file_id: number;
   file_name: string;
   material_category: string;

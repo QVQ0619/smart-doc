@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { listMaterialPackages, listMaterialSegments, getPackageStructured } from "./materials";
 
 describe("materials api", () => {
