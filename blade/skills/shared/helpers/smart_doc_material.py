@@ -76,6 +76,8 @@ def main(argv: list[str]) -> int:
     package_id = None
     if "--package" in args:
         i = args.index("--package")
+        if i + 1 >= len(args):
+            sys.stderr.write("[smart-doc-material] --package 缺少 id 参数\n"); return 1
         package_id = args[i + 1]
         args = args[:i] + args[i + 2:]
     paths = args
@@ -94,6 +96,8 @@ def main(argv: list[str]) -> int:
         sys.stderr.write(f"[smart-doc-material] 后端返回 {e.code}: {e.read().decode('utf-8','ignore')[:300]}\n"); return 4
     except urllib.error.URLError as e:
         sys.stderr.write(f"[smart-doc-material] 网络错误: {e.reason}\n"); return 3
+    except OSError as e:
+        sys.stderr.write(f"[smart-doc-material] 文件读取失败: {e}\n"); return 2
     pkg_id = result.get("package_id")
     for it in result.get("items", []):
         mf_id = it.get("material_file_id")

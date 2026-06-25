@@ -18,3 +18,11 @@ def test_wait_for_status_returns_terminal():
     status, segs = shim.wait_for_status(lambda: next(calls), 7, timeout=5, interval=0,
                                         sleep_fn=lambda s: None, clock=iter([0, 1, 2]).__next__)
     assert status == "done" and segs == 3
+
+
+def test_build_multipart_with_package_id(tmp_path):
+    a = tmp_path / "a.docx"; a.write_bytes(b"x")
+    body, ctype = shim.build_multipart([str(a)], package_id="42")
+    assert b'name="package_id"' in body
+    assert b"42" in body
+    assert body.count(b'name="files"') == 1
