@@ -1,4 +1,4 @@
-export interface MaterialFileBrief {
+﻿export interface MaterialFileBrief {
   material_file_id: number;
   file_name: string;
   material_category: string;
@@ -32,4 +32,21 @@ export function listMaterialPackages(): Promise<MaterialPackage[]> {
 }
 export function listMaterialSegments(id: number): Promise<MaterialSegment[]> {
   return fetch(`/api/material-files/${id}/segments`).then((r) => handle<MaterialSegment[]>(r));
+}
+
+export interface StructMember { id: number; member_role: string; name: string; title: string | null; unit_name: string | null; source_segment_id: number | null; }
+export interface StructCoopUnit { id: number; coop_type: string; unit_name: string; task_desc: string | null; applied_fund: number | null; source_segment_id: number | null; }
+export interface StructBudgetItem { id: number; category: string; item_name: string; amount: number; source_segment_id: number | null; }
+export interface StructAttachment { id: number; attachment_type: string; is_present: boolean; source_segment_id: number | null; }
+export interface StructField { id: number; field_code: string; field_value: string | null; extraction_status: string; source_segment_id: number | null; }
+export interface PackageStructured {
+  package_id: number;
+  members: StructMember[];
+  coop_units: StructCoopUnit[];
+  budget_items: StructBudgetItem[];
+  attachments: StructAttachment[];
+  fields: StructField[];
+}
+export function getPackageStructured(packageId: number): Promise<PackageStructured> {
+  return fetch(`/api/packages/${packageId}/structured`).then((r) => handle<PackageStructured>(r));
 }

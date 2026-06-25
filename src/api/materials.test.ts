@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { listMaterialPackages, listMaterialSegments } from "./materials";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { listMaterialPackages, listMaterialSegments, getPackageStructured } from "./materials";
 
 describe("materials api", () => {
   beforeEach(() => { vi.restoreAllMocks(); });
@@ -13,5 +13,12 @@ describe("materials api", () => {
   it("非 2xx 抛错", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 500 })));
     await expect(listMaterialSegments(7)).rejects.toThrow("HTTP 500");
+  });
+
+  it("getPackageStructured 请求正确 URL", async () => {
+    const data = { package_id: 3, members: [], coop_units: [], budget_items: [], attachments: [], fields: [] };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(data), { status: 200 })));
+    expect(await getPackageStructured(3)).toEqual(data);
+    expect(fetch).toHaveBeenCalledWith("/api/packages/3/structured");
   });
 });
