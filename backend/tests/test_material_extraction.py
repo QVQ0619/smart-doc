@@ -53,7 +53,9 @@ def test_replace_is_idempotent(client, monkeypatch):
     p = MaterialExtractPayload(members=[{"member_role": "applicant", "name": "甲"}])
     with Session(engine) as db:
         replace_package_extraction(db, pkg_id, p)
+    with Session(engine) as db:
         replace_package_extraction(db, pkg_id, p)  # 重跑
+    with Session(engine) as db:
         rows = db.execute(select(PackageMember).where(PackageMember.package_id == pkg_id)).scalars().all()
     assert len(rows) == 1  # 替换而非累积
 
