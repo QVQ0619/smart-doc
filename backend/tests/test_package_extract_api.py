@@ -24,6 +24,8 @@ def test_extract_and_structured_roundtrip(client, monkeypatch):
                "members": [{"member_role": "applicant", "name": "张三", "source_segment_id": seg_id}],
                "budget_items": [{"category": "设备费", "item_name": "服务器", "amount": 10}],
                "attachments": [{"attachment_type": "推荐信", "is_present": True}],
+               "coop_units": [{"coop_type": "合作单位", "unit_name": "乙单位"},
+                              {"coop_type": "联合承研", "unit_name": "丙单位", "applied_fund": 30.0}],
                "fields": [{"field_code": "project_name", "field_value": "X 研究"}]}
     r = client.post(f"/api/packages/{pkg_id}/extract", json=payload)
     assert r.status_code == 200, r.text
@@ -32,6 +34,9 @@ def test_extract_and_structured_roundtrip(client, monkeypatch):
     assert s["members"][0]["name"] == "张三"
     assert s["budget_items"][0]["amount"] == 10.0
     assert s["fields"][0]["field_code"] == "project_name"
+    coops = {c["unit_name"]: c for c in s["coop_units"]}
+    assert coops["乙单位"]["applied_fund"] is None
+    assert coops["丙单位"]["applied_fund"] == 30.0
 
 
 def test_extract_unknown_package_404(client):
@@ -48,3 +53,13 @@ def test_extract_bad_segment_422(client, monkeypatch):
 
 def test_structured_unknown_package_404(client):
     assert client.get("/api/packages/777777/structured").status_code == 404
+
+
+def test_package_segments_empty(client, monkeypatch):
+    # parse_file 返回空 → material_file 无 segment；segments 端点应返回空列表
+    monkeypatch.setattr(recognition, "parse_file", lambda path, ext: ([], "空文档"))
+    files = {"files": ("空.docx", io.BytesIO(b"PK\x03\x04x"), "application/octet-stream")}
+    pkg_id = client.post("/api/material-files", files=files).json()["package_id"]
+    rows = client.get(f"/api/packages/{pkg_id}/segments").json()
+    # 有 1 个 material_file 但其下无 segment
+    assert rows == [] or (len(rows) == 1 and rows[0]["segments"] == [])
