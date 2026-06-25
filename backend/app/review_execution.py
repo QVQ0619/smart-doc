@@ -67,7 +67,9 @@ def bind_package_config(db: Session, package_id: int, config_doc_id: int) -> tup
         raise LookupError(f"application_package {package_id} not found")
     config_id = materialize_config(db, config_doc_id)
     batch = db.get(ReviewBatch, pkg.batch_id)
-    if batch is not None and batch.batch_no == "__DEFAULT_BATCH__":
+    if batch is None:
+        raise LookupError(f"application_package {package_id} 未关联批次")
+    if batch.batch_no == "__DEFAULT_BATCH__":
         pkg_batch_no = f"BATCH-PKG{package_id}"
         dedicated = db.execute(select(ReviewBatch).where(ReviewBatch.batch_no == pkg_batch_no)).scalars().first()
         if dedicated is None:

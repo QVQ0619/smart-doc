@@ -39,10 +39,11 @@ def test_bind_reuses_dedicated_batch(client, monkeypatch):
     pkg_id = _make_package(client, monkeypatch)
     with Session(engine) as db:
         doc_id, _ = _seed_rule_doc(db)
-        bind_package_config(db, pkg_id, doc_id)
+        config_id, _ = bind_package_config(db, pkg_id, doc_id)
         first_batch = db.get(ApplicationPackage, pkg_id).batch_id
-        bind_package_config(db, pkg_id, doc_id)  # 再绑
+        config_id2, _ = bind_package_config(db, pkg_id, doc_id)  # 再绑
         assert db.get(ApplicationPackage, pkg_id).batch_id == first_batch  # 复用专属 batch
+        assert db.get(ReviewBatch, first_batch).config_id == config_id2  # config 仍正确写入
 
 
 def test_bind_unknown_package_raises(client):
