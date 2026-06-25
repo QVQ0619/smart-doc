@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlmodel import Session
 
-from .models import (ApplicationPackage, DeclaredProject, ProjectType, ResearchPerson,
-                     ResearchUnit, ReviewBatch, ReviewStage, SecrecyLevel, SysUser)
+from .models import (ApplicationPackage, DeclaredProject, FormField, FormTemplate,
+                     ProjectType, ResearchPerson, ResearchUnit, ReviewBatch,
+                     ReviewStage, SecrecyLevel, SysUser)
 
 SENTINEL = "__DEFAULT__"
 
@@ -77,3 +78,37 @@ def create_review_package(db: Session) -> int:
     db.commit()
     db.refresh(pkg)
     return pkg.id
+
+
+# 默认申报书标量字段集（extracted_field 经 field_code 映射 form_field_id）
+DEFAULT_FORM_FIELDS: list[tuple[str, str, str]] = [
+    ("project_name", "项目名称", "text"),
+    ("project_category", "项目类别", "enum"),
+    ("applicant_name", "申请人", "text"),
+    ("applicant_unit", "依托单位", "text"),
+    ("total_budget", "经费总额(万元)", "number"),
+    ("research_period", "研究周期", "text"),
+    ("secrecy_level", "密级", "enum"),
+]
+
+
+def ensure_default_form_template(db: Session) -> int:
+    """幂等创建默认 form_template + DEFAULT_FORM_FIELDS，返回 form_template.id。"""
+    refs = ensure_default_master_data(db)
+    tpl = _get_or_create(
+        db, FormTemplate,
+        (FormTemplate.project_type_id == refs.project_type_id)
+        & (FormTemplate.stage_id == refs.stage_id)
+        & (FormTemplate.version == SENTINEL),
+        project_type_id=refs.project_type_id, stage_id=refs.stage_id,
+        name="默认申报书模板", version=SENTINEL,
+    )
+    for seq, (code, fname, ltype) in enumerate(DEFAULT_FORM_FIELDS, start=1):
+        _get_or_create(
+            db, FormField,
+            (FormField.template_id == tpl.id) & (FormField.field_code == code),
+            template_id=tpl.id, field_code=code, field_name=fname,
+            logic_type=ltype, is_required=False, seq=seq,
+        )
+    db.commit()
+    return tpl.id
