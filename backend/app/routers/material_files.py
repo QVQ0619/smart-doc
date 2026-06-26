@@ -1,4 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlmodel import Session
 
@@ -151,3 +152,21 @@ def get_package_structured(package_id: int, db: Session = Depends(get_session)) 
         raise HTTPException(status_code=404, detail="application_package not found")
     from ..material_extraction import build_package_structured
     return build_package_structured(db, package_id)
+
+
+@router.get("/material-files/{material_file_id}/download")
+def download_material_file(
+    material_file_id: int,
+    db: Session = Depends(get_session),
+    storage: FileStorage = Depends(get_storage),
+):
+    mf = db.get(MaterialFile, material_file_id)
+    if mf is None:
+        raise HTTPException(status_code=404, detail="material_file not found")
+    fo = db.get(FileObject, mf.file_id) if mf.file_id else None
+    if fo is None or fo.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="file_object missing")
+    path = storage.base_dir / fo.object_key
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="file missing on disk")
+    return FileResponse(path, filename=fo.file_name, media_type=fo.mime_type or "application/octet-stream")

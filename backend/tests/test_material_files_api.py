@@ -61,3 +61,24 @@ def test_material_packages_aggregates_counts(client, monkeypatch):
 def test_recognize_unknown_material_404(client):
     r = client.post("/api/material-files/999999/recognize")
     assert r.status_code == 404
+
+
+# ---------- download ----------
+
+def test_download_material_file_returns_original_bytes(client):
+    """上传一个材料文件后，下载端点应返回原始字节及正确的 Content-Disposition。"""
+    content = b"download-test-content"
+    files = {"files": ("material-test.txt", io.BytesIO(content), "text/plain")}
+    r = client.post("/api/material-files", files=files)
+    assert r.status_code == 200
+    mf_id = r.json()["items"][0]["material_file_id"]
+
+    dl = client.get(f"/api/material-files/{mf_id}/download")
+    assert dl.status_code == 200
+    assert dl.content == content
+    assert "material-test.txt" in dl.headers.get("content-disposition", "")
+
+
+def test_download_material_file_unknown_404(client):
+    """不存在的 material_file_id 应返回 404。"""
+    assert client.get("/api/material-files/999999/download").status_code == 404
