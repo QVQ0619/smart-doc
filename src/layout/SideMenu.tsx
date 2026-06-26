@@ -16,10 +16,15 @@ const items: MenuProps["items"] = MENU_GROUPS.map((group) => ({
 }));
 
 export default function SideMenu() {
-  const route = useRouteStore((s) => s.route);
-  const setRoute = useRouteStore((s) => s.setRoute);
+  const nav = useRouteStore((s) => s.nav);
+  const navigate = useRouteStore((s) => s.navigate);
   const collapsed = useMenuCollapseStore((s) => s.collapsed);
   const toggle = useMenuCollapseStore((s) => s.toggle);
+
+  const selectedKey =
+    nav.name === "batch-detail" || nav.name === "rule-detail"
+      ? "batch-list"
+      : nav.name;
 
   if (collapsed) {
     return (
@@ -63,10 +68,10 @@ export default function SideMenu() {
       </div>
       <Menu
         mode="inline"
-        selectedKeys={[route]}
+        selectedKeys={[selectedKey]}
         items={items}
         style={{ borderInlineEnd: "none" }}
-        onClick={(info) => setRoute(info.key as RouteKey)}
+        onClick={(info) => navigate({ name: info.key as RouteKey })}
       />
     </div>
   );

@@ -4,7 +4,7 @@ import SideMenu from "./SideMenu";
 import { useRouteStore } from "../store/useRouteStore";
 
 beforeEach(() => {
-  useRouteStore.setState({ route: "home" });
+  useRouteStore.setState({ nav: { name: "home" } });
 });
 
 test("渲染品牌名与全部菜单项", async () => {
@@ -15,17 +15,15 @@ test("渲染品牌名与全部菜单项", async () => {
     "新建审查",
     "审查任务",
     "审查报告",
-    "规则库",
-    "配置包",
-    "审查文档库",
+    "项目批次",
     "关于流程",
   ]) {
     expect(screen.getByText(label)).toBeInTheDocument();
   }
 });
 
-test("点击菜单项更新路由 store", async () => {
+test("点击菜单项更新 nav store", async () => {
   render(<SideMenu />);
-  await userEvent.click(screen.getByText("新建审查"));
-  await waitFor(() => expect(useRouteStore.getState().route).toBe("review-new"));
+  await userEvent.click(screen.getByText("项目批次"));
+  await waitFor(() => expect(useRouteStore.getState().nav.name).toBe("batch-list"));
 });

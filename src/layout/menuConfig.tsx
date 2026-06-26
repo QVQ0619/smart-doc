@@ -3,9 +3,7 @@ import {
   FileAddOutlined,
   ProfileOutlined,
   FileDoneOutlined,
-  BookOutlined,
   AppstoreOutlined,
-  FolderOpenOutlined,
   InfoCircleOutlined,
 } from "@ant-design/icons";
 import type { ReactNode } from "react";
@@ -15,9 +13,7 @@ export type RouteKey =
   | "review-new"
   | "review-tasks"
   | "review-report"
-  | "lib-rules"
-  | "lib-packs"
-  | "lib-archive"
+  | "batch-list"
   | "about";
 
 export interface MenuItemDef {
@@ -45,11 +41,9 @@ export const MENU_GROUPS: MenuGroupDef[] = [
     ],
   },
   {
-    title: "资源库",
+    title: "资源",
     items: [
-      { key: "lib-rules", label: "规则库", icon: <BookOutlined /> },
-      { key: "lib-packs", label: "配置包", icon: <AppstoreOutlined /> },
-      { key: "lib-archive", label: "审查文档库", icon: <FolderOpenOutlined /> },
+      { key: "batch-list", label: "项目批次", icon: <AppstoreOutlined /> },
     ],
   },
   {

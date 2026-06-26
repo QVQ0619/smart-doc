@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { useRouteStore } from "./store/useRouteStore";
 
@@ -9,7 +8,7 @@ vi.mock("./layout/ChatPanel", () => ({
 }));
 
 beforeEach(() => {
-  useRouteStore.setState({ route: "home" });
+  useRouteStore.setState({ nav: { name: "home" } });
 });
 
 test("默认渲染工作台页", async () => {
@@ -19,10 +18,16 @@ test("默认渲染工作台页", async () => {
   ).toBeInTheDocument();
 });
 
-test("点击菜单切换中间页", async () => {
+test("nav 为 batch-list 渲染项目批次页", async () => {
+  useRouteStore.setState({ nav: { name: "batch-list" } });
   render(<App />);
-  await userEvent.click(screen.getByText("审查报告"));
-  expect(
-    await screen.findByRole("heading", { name: "审查报告" }),
-  ).toBeInTheDocument();
+  expect(await screen.findByTestId("batch-list-page")).toBeInTheDocument();
+});
+
+test("nav 为 batch-detail 渲染批次详情页含 id", async () => {
+  useRouteStore.setState({ nav: { name: "batch-detail", batchId: 3, batchTitle: "甲" } });
+  render(<App />);
+  const el = await screen.findByTestId("batch-detail-page");
+  expect(el).toBeInTheDocument();
+  expect(el.textContent).toContain("#3");
 });
