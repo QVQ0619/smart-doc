@@ -293,6 +293,10 @@ def review_action(db: Session, round_check_id: int, action: str,
                   remark: str | None, version: int) -> "CheckOut":
     """人工复核:confirm(沿用初判)/overrule(改 final)。写 check_review_action+乐观锁+重聚合。
     不存在→LookupError;version 不符→ConflictError;action/枚举非法→ValueError。"""
+    # 先在 session 干净时取主数据:ensure_default_master_data 内部无条件 commit,
+    # 若在 rc 字段已改之后调用会触发提前 commit,把 DB 留在 status 已变/version 未递增/
+    # 无审计行的无效中间态,破坏乐观锁+审计行原子性。上移确保后续所有修改在单次 commit 内完成。
+    actor_id = ensure_default_master_data(db).sys_user_id
     rc = db.get(RoundCheck, round_check_id)
     if rc is None:
         raise LookupError(f"round_check {round_check_id} not found")
@@ -313,7 +317,6 @@ def review_action(db: Session, round_check_id: int, action: str,
         rc.status = "overruled"
     else:
         raise ValueError(f"action 非法: {action}")
-    actor_id = ensure_default_master_data(db).sys_user_id
     db.add(CheckReviewAction(round_check_id=rc.id, actor_id=actor_id, action=action,
                              from_result=from_result, to_result=rc.final_result, remark=remark))
     rc.version += 1

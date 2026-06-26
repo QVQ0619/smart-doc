@@ -28,6 +28,8 @@ def test_confirm_sets_final_and_reaggregates(client, monkeypatch):
     body = r.json()
     assert body["final_result"] == "pass" and body["status"] == "confirmed"
     assert body["version"] == ver + 1
+    got = client.get(f"/api/packages/{pkg_id}/review").json()
+    assert got["round"]["conclusion"] == "accept"  # confirm 路径也触发重聚合
 
 
 def test_overrule_changes_final_and_conclusion(client, monkeypatch):
