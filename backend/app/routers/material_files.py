@@ -84,24 +84,8 @@ def upload_material_files(
 
 @router.get("/material-packages", response_model=list[MaterialPackageOut])
 def list_material_packages(db: Session = Depends(get_session)) -> list[MaterialPackageOut]:
-    pkgs = db.execute(select(ApplicationPackage).order_by(ApplicationPackage.id.desc())).scalars().all()
-    out: list[MaterialPackageOut] = []
-    for pkg in pkgs:
-        mfs = db.execute(select(MaterialFile).where(MaterialFile.package_id == pkg.id)
-                         .order_by(MaterialFile.id)).scalars().all()
-        if not mfs:
-            continue  # 只列有材料的包
-        briefs: list[MaterialFileBrief] = []
-        for mf in mfs:
-            seg_count = db.execute(select(func.count()).select_from(ParseSegment)
-                                   .where(ParseSegment.material_file_id == mf.id)).scalar_one()
-            briefs.append(MaterialFileBrief(
-                material_file_id=mf.id, file_name=mf.file_name,
-                material_category=mf.material_category,
-                recognition_status=mf.recognition_status, segment_count=seg_count))
-        out.append(MaterialPackageOut(package_id=pkg.id, created_at=pkg.created_at,
-                                      file_count=len(briefs), files=briefs))
-    return out
+    from ..materials import list_packages
+    return list_packages(db, batch_id=None)
 
 
 @router.get("/material-files/{material_file_id}/segments", response_model=list[SegmentOut])

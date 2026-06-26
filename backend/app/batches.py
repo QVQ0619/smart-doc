@@ -4,10 +4,10 @@ from sqlalchemy import delete, distinct, func, select
 from sqlmodel import Session
 
 from .materials import ensure_default_master_data
-from .models import (ApplicationPackage, BatchRuleDoc, ProjectType, RegulationClause,
-                     ReviewBatch, ReviewRule, ReviewRuleClause, ReviewRuleVersion,
-                     ReviewStage, StandardDoc)
-from .schemas import BatchCreateIn, BatchOut
+from .models import (ApplicationPackage, BatchRuleDoc, FileObject, ProjectType,
+                     RegulationClause, ReviewBatch, ReviewRule, ReviewRuleClause,
+                     ReviewRuleVersion, ReviewStage, StandardDoc)
+from .schemas import BatchCreateIn, BatchDetailOut, BatchOut, StandardDocOut
 
 
 def bind_rule_docs(db: Session, batch_id: int, doc_ids: list[int]) -> int:
@@ -37,68 +37,61 @@ def list_batch_rule_docs(db: Session, batch_id: int) -> list[int]:
     return [r[0] for r in rows]
 
 
-def list_batches(db: Session) -> list[BatchOut]:
-    """返回全部批次（含 __DEFAULT_BATCH__），带聚合计数。"""
-    # 1. 批次基本信息 + project_type/stage 名称
-    batch_rows = db.execute(
-        select(
-            ReviewBatch.id,
-            ReviewBatch.batch_no,
-            ReviewBatch.status,
-            ReviewBatch.declare_period,
-            ProjectType.name,
-            ReviewStage.name,
-        )
-        .join(ProjectType, ProjectType.id == ReviewBatch.project_type_id)
-        .join(ReviewStage, ReviewStage.id == ReviewBatch.stage_id)
-        .order_by(ReviewBatch.id)
-    ).all()
+def _batch_to_out(db: Session, batch: ReviewBatch) -> BatchOut:
+    """把单个 ReviewBatch 行组装成 BatchOut（含三个聚合计数）。
+    list_batches 与 get_batch_detail 共用此函数，保证计数口径一致。"""
+    pt = db.get(ProjectType, batch.project_type_id)
+    stage = db.get(ReviewStage, batch.stage_id)
 
-    # 2. 申报包数量（排除软删除）
-    mat_rows = db.execute(
-        select(ApplicationPackage.batch_id, func.count(ApplicationPackage.id))
-        .where(ApplicationPackage.deleted_at.is_(None))
-        .group_by(ApplicationPackage.batch_id)
-    ).all()
-    mat_counts: dict[int, int] = {bid: cnt for bid, cnt in mat_rows}
+    mat_count: int = db.execute(
+        select(func.count(ApplicationPackage.id))
+        .where(ApplicationPackage.batch_id == batch.id,
+               ApplicationPackage.deleted_at.is_(None))
+    ).scalar_one()
 
-    # 3. 绑定规则文件数
-    doc_rows = db.execute(
-        select(BatchRuleDoc.batch_id, func.count(BatchRuleDoc.id))
-        .group_by(BatchRuleDoc.batch_id)
-    ).all()
-    doc_counts: dict[int, int] = {bid: cnt for bid, cnt in doc_rows}
+    doc_count: int = db.execute(
+        select(func.count(BatchRuleDoc.id))
+        .where(BatchRuleDoc.batch_id == batch.id)
+    ).scalar_one()
 
-    # 4. 有效规则数（口径与 config_packages 完全一致：同 join，is_active 双过滤，distinct review_rule.id）
-    rule_rows = db.execute(
-        select(
-            BatchRuleDoc.batch_id,
-            func.count(distinct(ReviewRule.id)),
-        )
+    # 有效规则数：口径与 config_packages 完全一致（is_active 双过滤，distinct review_rule.id）
+    rule_count: int = db.execute(
+        select(func.count(distinct(ReviewRule.id)))
+        .select_from(BatchRuleDoc)
         .join(StandardDoc, StandardDoc.id == BatchRuleDoc.standard_doc_id)
         .join(RegulationClause, RegulationClause.standard_doc_id == StandardDoc.id)
         .join(ReviewRuleClause, ReviewRuleClause.clause_id == RegulationClause.id)
         .join(ReviewRuleVersion, ReviewRuleVersion.id == ReviewRuleClause.rule_version_id)
         .join(ReviewRule, ReviewRule.current_version_id == ReviewRuleVersion.id)
-        .where(StandardDoc.is_active == True, ReviewRule.is_active == True)  # noqa: E712
-        .group_by(BatchRuleDoc.batch_id)
-    ).all()
-    rule_counts: dict[int, int] = {bid: cnt for bid, cnt in rule_rows}
-
-    return [
-        BatchOut(
-            id=bid,
-            batch_no=batch_no,
-            project_type_name=pt_name,
-            stage_name=stage_name,
-            status=status,
-            declare_period=declare_period,
-            material_count=mat_counts.get(bid, 0),
-            rule_doc_count=doc_counts.get(bid, 0),
-            rule_count=rule_counts.get(bid, 0),
+        .where(
+            BatchRuleDoc.batch_id == batch.id,
+            StandardDoc.is_active == True,   # noqa: E712
+            ReviewRule.is_active == True,    # noqa: E712
         )
-        for bid, batch_no, status, declare_period, pt_name, stage_name in batch_rows
-    ]
+    ).scalar_one()
+
+    return BatchOut(
+        id=batch.id,
+        batch_no=batch.batch_no,
+        project_type_name=pt.name if pt else "",
+        stage_name=stage.name if stage else "",
+        status=batch.status,
+        declare_period=batch.declare_period,
+        material_count=mat_count,
+        rule_doc_count=doc_count,
+        rule_count=rule_count,
+    )
+
+
+def list_batches(db: Session) -> list[BatchOut]:
+    """返回全部批次（含 __DEFAULT_BATCH__），带聚合计数。"""
+    batches = db.execute(
+        select(ReviewBatch)
+        .join(ProjectType, ProjectType.id == ReviewBatch.project_type_id)
+        .join(ReviewStage, ReviewStage.id == ReviewBatch.stage_id)
+        .order_by(ReviewBatch.id)
+    ).scalars().all()
+    return [_batch_to_out(db, b) for b in batches]
 
 
 def create_batch(db: Session, body: BatchCreateIn) -> BatchOut:
@@ -140,4 +133,49 @@ def create_batch(db: Session, body: BatchCreateIn) -> BatchOut:
         material_count=0,
         rule_doc_count=0,
         rule_count=0,
+    )
+
+
+def list_batch_standard_docs(db: Session, batch_id: int) -> list[StandardDocOut]:
+    """返回该批次绑定的规则文件列表（StandardDocOut），口径同 standard_docs.list_standard_docs：
+    join FileObject，is_active & deleted_at IS NULL，按 created_at desc, id desc 排序。
+    绑定为空 → []。"""
+    doc_ids = list_batch_rule_docs(db, batch_id)
+    if not doc_ids:
+        return []
+    rows = db.execute(
+        select(StandardDoc, FileObject)
+        .join(FileObject, StandardDoc.file_id == FileObject.id)
+        .where(
+            StandardDoc.id.in_(doc_ids),
+            StandardDoc.is_active == True,    # noqa: E712
+            FileObject.deleted_at == None,    # noqa: E711
+        )
+        .order_by(StandardDoc.created_at.desc(), StandardDoc.id.desc())
+    ).all()
+    return [
+        StandardDocOut(
+            id=sd.id,
+            doc_code=sd.doc_code,
+            title=sd.title,
+            file_name=fo.file_name,
+            size_bytes=fo.size_bytes,
+            mime_type=fo.mime_type,
+            created_at=sd.created_at,
+            recognition_status=sd.recognition_status,
+        )
+        for sd, fo in rows
+    ]
+
+
+def get_batch_detail(db: Session, batch_id: int) -> BatchDetailOut:
+    """返回批次详情（元信息 + 绑定规则文件列表）。批次不存在 → LookupError。"""
+    batch = db.get(ReviewBatch, batch_id)
+    if batch is None:
+        raise LookupError(f"批次不存在: {batch_id}")
+    base = _batch_to_out(db, batch)
+    rule_docs = list_batch_standard_docs(db, batch_id)
+    return BatchDetailOut(
+        **base.model_dump(),
+        rule_docs=rule_docs,
     )

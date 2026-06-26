@@ -4,12 +4,13 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlmodel import Session
 
 from .models import (ApplicationPackage, DeclaredProject, FormField, FormTemplate,
-                     ProjectType, ResearchPerson, ResearchUnit, ReviewBatch,
-                     ReviewStage, SecrecyLevel, SysUser)
+                     MaterialFile, ParseSegment, ProjectType, ResearchPerson,
+                     ResearchUnit, ReviewBatch, ReviewStage, SecrecyLevel, SysUser)
+from .schemas import MaterialFileBrief, MaterialPackageOut
 
 SENTINEL = "__DEFAULT__"
 
@@ -90,6 +91,43 @@ DEFAULT_FORM_FIELDS: list[tuple[str, str, str]] = [
     ("research_period", "研究周期", "text"),
     ("secrecy_level", "密级", "enum"),
 ]
+
+
+def list_packages(db: Session, batch_id: int | None = None) -> list[MaterialPackageOut]:
+    """列出有材料的审查包；batch_id 给定则只列该批次的包（None = 全部，保持原行为）。"""
+    stmt = select(ApplicationPackage).order_by(ApplicationPackage.id.desc())
+    if batch_id is not None:
+        stmt = stmt.where(ApplicationPackage.batch_id == batch_id)
+    pkgs = db.execute(stmt).scalars().all()
+    out: list[MaterialPackageOut] = []
+    for pkg in pkgs:
+        mfs = db.execute(
+            select(MaterialFile)
+            .where(MaterialFile.package_id == pkg.id)
+            .order_by(MaterialFile.id)
+        ).scalars().all()
+        if not mfs:
+            continue  # 只列有材料的包
+        briefs: list[MaterialFileBrief] = []
+        for mf in mfs:
+            seg_count = db.execute(
+                select(func.count()).select_from(ParseSegment)
+                .where(ParseSegment.material_file_id == mf.id)
+            ).scalar_one()
+            briefs.append(MaterialFileBrief(
+                material_file_id=mf.id,
+                file_name=mf.file_name,
+                material_category=mf.material_category,
+                recognition_status=mf.recognition_status,
+                segment_count=seg_count,
+            ))
+        out.append(MaterialPackageOut(
+            package_id=pkg.id,
+            created_at=pkg.created_at,
+            file_count=len(briefs),
+            files=briefs,
+        ))
+    return out
 
 
 def ensure_default_form_template(db: Session) -> int:

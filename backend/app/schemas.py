@@ -435,3 +435,16 @@ class BatchOut(BaseModel):
 class BatchCreateIn(BaseModel):
     batch_no: str
     declare_period: Optional[str] = None
+
+
+class BatchDetailOut(BatchOut):
+    """批次详情：继承 BatchOut 全字段 + 该批次绑定的规则文件列表。"""
+    rule_docs: list[StandardDocOut]
+
+
+class BindRuleDocsIn(BaseModel):
+    standard_doc_ids: list[int]
+
+
+class BindRuleDocsResult(BaseModel):
+    bound_count: int

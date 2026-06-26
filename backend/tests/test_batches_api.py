@@ -1,4 +1,7 @@
 """GET /api/batches 批次列表 + POST /api/batches 新建批次 接口测试。"""
+import io
+import uuid
+
 import app.config as config
 
 
@@ -125,3 +128,205 @@ def test_default_batch_no_duplicate(client):
     # 再尝试 POST __DEFAULT_BATCH__ → 应 422
     r = _post_batch(client, "__DEFAULT_BATCH__")
     assert r.status_code == 422
+
+
+# --------------------------------------------------------------------------- #
+# 辅助：上传规则文件
+# --------------------------------------------------------------------------- #
+
+def _upload_standard_doc(client, filename: str = "规则A.pdf") -> int:
+    """上传一个规则文件（内容含随机 UUID 以避免 content_hash 去重），返回 standard_doc id。"""
+    content = f"rule-bytes-{uuid.uuid4().hex}".encode()
+    r = client.post(
+        "/api/standard-docs",
+        files=[("files", (filename, content, "application/pdf"))],
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["uploaded"], f"上传失败或冲突: {body}"
+    return body["uploaded"][0]["id"]
+
+
+# --------------------------------------------------------------------------- #
+# GET /api/batches/{id} 批次详情
+# --------------------------------------------------------------------------- #
+
+def test_get_batch_detail_empty_rule_docs(client):
+    """新建批次 → GET /batches/{id} 200，含 BatchOut 全字段 + rule_docs=[]。"""
+    r = _post_batch(client, "DETAIL-EMPTY")
+    batch_id = r.json()["id"]
+
+    r2 = client.get(f"/api/batches/{batch_id}")
+    assert r2.status_code == 200
+    data = r2.json()
+    # 含 BatchOut 全字段
+    for field in ("id", "batch_no", "project_type_name", "stage_name", "status",
+                  "material_count", "rule_doc_count", "rule_count"):
+        assert field in data, f"缺少字段: {field}"
+    assert data["batch_no"] == "DETAIL-EMPTY"
+    assert data["rule_docs"] == []
+    assert data["rule_doc_count"] == 0
+
+
+def test_get_batch_detail_unknown_404(client):
+    """未知批次 → 404。"""
+    r = client.get("/api/batches/99999")
+    assert r.status_code == 404
+
+
+def test_get_batch_detail_no_auth_needed(client, monkeypatch):
+    """GET 详情端点免鉴权。"""
+    monkeypatch.setattr(config.settings, "api_key", "secret")
+    r = _post_batch(client, "DETAIL-NOAUTH", headers={"X-API-Key": "secret"})
+    batch_id = r.json()["id"]
+    r2 = client.get(f"/api/batches/{batch_id}")
+    assert r2.status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# POST /api/batches/{id}/bind-rule-docs 绑定规则文件
+# --------------------------------------------------------------------------- #
+
+def test_bind_rule_docs_two_docs(client):
+    """绑定 2 个规则文件 → bound_count=2；详情 rule_docs 含 2 项，rule_doc_count=2。"""
+    batch_id = _post_batch(client, "BIND-2DOCS").json()["id"]
+    d1 = _upload_standard_doc(client, "规则X.pdf")
+    d2 = _upload_standard_doc(client, "规则Y.pdf")
+
+    # 绑定
+    rb = client.post(f"/api/batches/{batch_id}/bind-rule-docs",
+                     json={"standard_doc_ids": [d1, d2]})
+    assert rb.status_code == 200
+    assert rb.json()["bound_count"] == 2
+
+    # 详情
+    detail = client.get(f"/api/batches/{batch_id}").json()
+    assert detail["rule_doc_count"] == 2
+    assert len(detail["rule_docs"]) == 2
+    ids_in_detail = {doc["id"] for doc in detail["rule_docs"]}
+    assert ids_in_detail == {d1, d2}
+
+    # 子集端点
+    r_docs = client.get(f"/api/batches/{batch_id}/standard-docs")
+    assert r_docs.status_code == 200
+    assert len(r_docs.json()) == 2
+
+
+def test_bind_rule_docs_idempotent_rebind(client):
+    """重绑单个 → bound_count=1，详情 rule_docs 1 项。"""
+    batch_id = _post_batch(client, "BIND-REBIND").json()["id"]
+    d1 = _upload_standard_doc(client, "规则P.pdf")
+    d2 = _upload_standard_doc(client, "规则Q.pdf")
+
+    # 先绑 2 个
+    client.post(f"/api/batches/{batch_id}/bind-rule-docs",
+                json={"standard_doc_ids": [d1, d2]})
+
+    # 重绑只剩 d1
+    rb = client.post(f"/api/batches/{batch_id}/bind-rule-docs",
+                     json={"standard_doc_ids": [d1]})
+    assert rb.status_code == 200
+    assert rb.json()["bound_count"] == 1
+
+    detail = client.get(f"/api/batches/{batch_id}").json()
+    assert detail["rule_doc_count"] == 1
+    assert len(detail["rule_docs"]) == 1
+    assert detail["rule_docs"][0]["id"] == d1
+
+
+def test_bind_rule_docs_unknown_batch_404(client):
+    """bind 到未知批次 → 404。"""
+    d1 = _upload_standard_doc(client, "规则Z.pdf")
+    r = client.post("/api/batches/99999/bind-rule-docs",
+                    json={"standard_doc_ids": [d1]})
+    assert r.status_code == 404
+
+
+def test_bind_rule_docs_unknown_doc_404(client):
+    """bind 含未知 doc → 404。"""
+    batch_id = _post_batch(client, "BIND-UNKNOWNDOC").json()["id"]
+    r = client.post(f"/api/batches/{batch_id}/bind-rule-docs",
+                    json={"standard_doc_ids": [99999]})
+    assert r.status_code == 404
+
+
+def test_bind_rule_docs_requires_key(client, monkeypatch):
+    """配置 API key 后，bind 缺 key → 401；GET 详情免 key。"""
+    monkeypatch.setattr(config.settings, "api_key", "secret")
+    batch_id = _post_batch(client, "BIND-AUTH", headers={"X-API-Key": "secret"}).json()["id"]
+
+    # 缺 key → 401
+    r_no_key = client.post(f"/api/batches/{batch_id}/bind-rule-docs",
+                            json={"standard_doc_ids": []})
+    assert r_no_key.status_code == 401
+
+    # GET 详情免 key
+    r_get = client.get(f"/api/batches/{batch_id}")
+    assert r_get.status_code == 200
+
+    # GET standard-docs 子集免 key
+    r_docs = client.get(f"/api/batches/{batch_id}/standard-docs")
+    assert r_docs.status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# GET /api/batches/{id}/standard-docs 子集
+# --------------------------------------------------------------------------- #
+
+def test_batch_standard_docs_empty(client):
+    """未绑定时，子集端点返回空列表。"""
+    batch_id = _post_batch(client, "SUBDOCS-EMPTY").json()["id"]
+    r = client.get(f"/api/batches/{batch_id}/standard-docs")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+# --------------------------------------------------------------------------- #
+# GET /api/batches/{id}/packages 材料包子集
+# --------------------------------------------------------------------------- #
+
+def test_batch_packages_empty(client):
+    """空批次，packages 子集端点返回 []。"""
+    batch_id = _post_batch(client, "PKGS-EMPTY").json()["id"]
+    r = client.get(f"/api/batches/{batch_id}/packages")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_batch_packages_isolation(client, monkeypatch):
+    """批次 A 有含材料的包，批次 B 无；GET /batches/A/packages 有该包，B 无。
+    同时 GET /material-packages（全局）仍含该包（行为不变）。"""
+    from app import recognition
+
+    monkeypatch.setattr(recognition, "parse_file", lambda path, ext: (
+        [recognition.SegmentDraft(1, {"page": 1}, "paragraph", "正文")], None))
+
+    # 建两个批次
+    batch_a = _post_batch(client, "PKG-BATCH-A").json()["id"]
+    batch_b = _post_batch(client, "PKG-BATCH-B").json()["id"]
+
+    # 上传材料文件（会自动造包，绑到默认批次）
+    files = {"files": ("申请书.docx", io.BytesIO(b"PK\x03\x04dummy"),
+                       "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+    upload = client.post("/api/material-files", files=files).json()
+    pkg_id = upload["package_id"]
+
+    # 把该包的 batch_id 改成 batch_a
+    from sqlmodel import Session
+    from app.db import engine
+    from app.models import ApplicationPackage
+    with Session(engine) as s:
+        pkg = s.get(ApplicationPackage, pkg_id)
+        pkg.batch_id = batch_a
+        s.add(pkg)
+        s.commit()
+
+    # batch_a 有该包，batch_b 无
+    pkgs_a = client.get(f"/api/batches/{batch_a}/packages").json()
+    pkgs_b = client.get(f"/api/batches/{batch_b}/packages").json()
+    assert any(p["package_id"] == pkg_id for p in pkgs_a), "batch_a 应含该包"
+    assert all(p["package_id"] != pkg_id for p in pkgs_b), "batch_b 不应含该包"
+
+    # 全局列表仍含该包（委托不影响原行为）
+    pkgs_global = client.get("/api/material-packages").json()
+    assert any(p["package_id"] == pkg_id for p in pkgs_global), "全局列表应仍含该包"
