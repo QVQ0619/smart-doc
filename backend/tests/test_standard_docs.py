@@ -101,6 +101,17 @@ def test_download_returns_original_bytes(client):
     r = client.get(f"/api/standard-docs/{doc['id']}/download")
     assert r.status_code == 200
     assert r.content == b"hello-bytes"
+    # 浏览器内预览而非强制下载
+    assert r.headers.get("content-disposition", "").startswith("inline")
+
+
+def test_download_pdf_is_inline_with_pdf_media_type(client):
+    # 即使入库 mime 是 text/plain(上传 content_type)，也按扩展名推断为 application/pdf 并 inline，浏览器可预览
+    doc = _upload_one(client, "report.pdf", b"%PDF-1.4 fake")
+    r = client.get(f"/api/standard-docs/{doc['id']}/download")
+    assert r.status_code == 200
+    assert r.headers.get("content-disposition", "").startswith("inline")
+    assert r.headers.get("content-type", "").startswith("application/pdf")
 
 
 def test_download_unknown_404(client):

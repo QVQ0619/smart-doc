@@ -1,3 +1,5 @@
+import mimetypes
+
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
@@ -169,4 +171,8 @@ def download_material_file(
     path = storage.base_dir / fo.object_key
     if not path.exists():
         raise HTTPException(status_code=404, detail="file missing on disk")
-    return FileResponse(path, filename=fo.file_name, media_type=fo.mime_type or "application/octet-stream")
+    # inline + 按扩展名推断 media_type：浏览器内预览(PDF/图片)而非强制下载；
+    # 入库 mime 常为 octet-stream(agent/shim 上传)，扩展名推断更可靠。无法内联的类型(如 docx)浏览器仍会下载。
+    media_type = mimetypes.guess_type(fo.file_name)[0] or fo.mime_type or "application/octet-stream"
+    return FileResponse(path, filename=fo.file_name, media_type=media_type,
+                        content_disposition_type="inline")

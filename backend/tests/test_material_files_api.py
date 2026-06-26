@@ -76,7 +76,20 @@ def test_download_material_file_returns_original_bytes(client):
     dl = client.get(f"/api/material-files/{mf_id}/download")
     assert dl.status_code == 200
     assert dl.content == content
-    assert "material-test.txt" in dl.headers.get("content-disposition", "")
+    cd = dl.headers.get("content-disposition", "")
+    assert cd.startswith("inline")          # 浏览器内预览而非强制下载
+    assert "material-test.txt" in cd
+
+
+def test_download_material_file_pdf_is_inline_with_pdf_media_type(client):
+    """PDF 材料即使入库 mime 为 text/plain，也按扩展名推断 application/pdf 并 inline，浏览器可预览。"""
+    files = {"files": ("plan.pdf", io.BytesIO(b"%PDF-1.4 fake"), "text/plain")}
+    r = client.post("/api/material-files", files=files)
+    mf_id = r.json()["items"][0]["material_file_id"]
+    dl = client.get(f"/api/material-files/{mf_id}/download")
+    assert dl.status_code == 200
+    assert dl.headers.get("content-disposition", "").startswith("inline")
+    assert dl.headers.get("content-type", "").startswith("application/pdf")
 
 
 def test_download_material_file_unknown_404(client):
