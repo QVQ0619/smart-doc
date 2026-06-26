@@ -1,24 +1,25 @@
 import { useMemo, useState } from "react";
-import { Modal, Select, Input, message } from "antd";
+import { message } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPackageReview, postReviewAction,
          type ReviewCheck, type PackageReview } from "../../api/review";
-import { RESULT, type ResultKey } from "./review-constants";
+import { getPackageSegments, getPackageStructured } from "../../api/materials";
+import { type ResultKey } from "./review-constants";
 import { groupByDimension, countChecks, type DimensionGroupData } from "./review-grouping";
 import VerdictBanner from "./VerdictBanner";
 import StatCards from "./StatCards";
 import DimensionGroup from "./DimensionGroup";
-
-const RESULT_OPTIONS = ["pass", "fail", "need_review", "not_applicable"]
-  .map((v) => ({ value: v, label: RESULT[v].label }));
+import EvidenceDrawer from "./EvidenceDrawer";
+import OverruleDrawer from "./OverruleDrawer";
 
 export default function ReviewWorkbench({ packageId }: { packageId: number }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["pkg-review", packageId], queryFn: () => getPackageReview(packageId) });
   const [filter, setFilter] = useState<ResultKey | null>(null);
   const [overrule, setOverrule] = useState<ReviewCheck | null>(null);
-  const [ovResult, setOvResult] = useState("pass");
-  const [ovRemark, setOvRemark] = useState("");
+  const [evidence, setEvidence] = useState<ReviewCheck | null>(null);
+  const segQ = useQuery({ queryKey: ["pkg-segments", packageId], queryFn: () => getPackageSegments(packageId), enabled: evidence !== null });
+  const structQ = useQuery({ queryKey: ["pkg-structured", packageId], queryFn: () => getPackageStructured(packageId), enabled: evidence !== null });
   const mut = useMutation({
     mutationFn: (v: { id: number; body: Parameters<typeof postReviewAction>[1] }) =>
       postReviewAction(v.id, v.body),
@@ -41,7 +42,6 @@ export default function ReviewWorkbench({ packageId }: { packageId: number }) {
   const confirmGroup = (g: DimensionGroupData) =>
     g.checks.filter((c) => c.status === "open" && (c.final_result ?? c.effective_result ?? c.initial_result) === "pass")
       .forEach(confirm);
-  const openEvidence = () => message.info("出处抽屉将在 P1 接入");
 
   return (
     <div>
@@ -49,21 +49,18 @@ export default function ReviewWorkbench({ packageId }: { packageId: number }) {
       <StatCards counts={counts} active={filter} onToggle={(k) => setFilter(filter === k ? null : k)} />
       {groups.map((g) => (
         <DimensionGroup key={g.code} group={g} filter={filter}
-          onConfirm={confirm} onEvidence={openEvidence}
-          onOverrule={(c) => { setOverrule(c); setOvResult("pass"); setOvRemark(""); }}
+          onConfirm={confirm} onEvidence={setEvidence}
+          onOverrule={setOverrule}
           onConfirmGroup={confirmGroup} />
       ))}
-      <Modal title="人工改判" open={overrule !== null} onCancel={() => setOverrule(null)}
-        onOk={() => {
+      <EvidenceDrawer check={evidence} segments={segQ.data} structured={structQ.data}
+        onClose={() => setEvidence(null)} />
+      <OverruleDrawer check={overrule} onClose={() => setOverrule(null)}
+        onSubmit={(final_result, remark) => {
           if (overrule) mut.mutate({ id: overrule.round_check_id,
-            body: { action: "overrule", final_result: ovResult, remark: ovRemark, version: overrule.version } });
+            body: { action: "overrule", final_result, remark, version: overrule.version } });
           setOverrule(null);
-        }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <Select value={ovResult} onChange={setOvResult} options={RESULT_OPTIONS} />
-          <Input.TextArea value={ovRemark} onChange={(e) => setOvRemark(e.target.value)} placeholder="复核意见" rows={2} />
-        </div>
-      </Modal>
+        }} />
     </div>
   );
 }

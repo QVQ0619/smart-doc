@@ -62,4 +62,18 @@ describe("ReviewPanel", () => {
     renderWithQuery(<ReviewPanel />);
     await waitFor(() => expect(screen.getByText(/暂无可审查/)).toBeInTheDocument());
   });
+
+  it("点出处打开原文抽屉", async () => {
+    vi.spyOn(matApi, "listMaterialPackages").mockResolvedValue([PKG] as never);
+    vi.spyOn(revApi, "getPackageReview").mockResolvedValue(REVIEW as never);
+    vi.spyOn(matApi, "getPackageSegments").mockResolvedValue([{ material_file_id: 1, file_name: "a.pdf",
+      segments: [{ id: 5, page_no: 1, locator: null, segment_type: "text", content_text: "申请人原文片段" }] }] as never);
+    vi.spyOn(matApi, "getPackageStructured").mockResolvedValue(
+      { package_id: 3, members: [], coop_units: [], budget_items: [], attachments: [], fields: [] } as never);
+    const { container } = renderWithQuery(<ReviewPanel />);
+    await expandFirst(container);
+    await waitFor(() => expect(screen.getByText(/段落#5/)).toBeInTheDocument());
+    fireEvent.click(screen.getByText(/段落#5/));
+    await waitFor(() => expect(screen.getByText(/申请人原文片段/)).toBeInTheDocument());
+  });
 });
