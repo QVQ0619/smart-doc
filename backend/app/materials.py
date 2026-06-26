@@ -56,9 +56,19 @@ def ensure_default_master_data(db: Session) -> DefaultRefs:
     return DefaultRefs(pt.id, stage.id, sl.id, unit.id, person.id, su.id, batch.id)
 
 
-def create_review_package(db: Session) -> int:
-    """新建一份审查包（declared_project + application_package），复用占位主数据/默认 batch。返回 package_id。"""
+def create_review_package(db: Session, batch_id: int | None = None) -> int:
+    """新建一份审查包（declared_project + application_package）。
+
+    batch_id 指定则落该批次；None = 默认批次（兜底，向后兼容）。
+    batch_id 不存在 → LookupError。返回 package_id。
+    """
     refs = ensure_default_master_data(db)
+    if batch_id is None:
+        target_batch = refs.batch_id
+    else:
+        if db.get(ReviewBatch, batch_id) is None:
+            raise LookupError(f"批次不存在: {batch_id}")
+        target_batch = batch_id
     dp = DeclaredProject(
         project_code=f"DP-{uuid.uuid4().hex[:12]}",
         project_name="待审查申请",
@@ -70,7 +80,7 @@ def create_review_package(db: Session) -> int:
     db.add(dp)
     db.flush()
     pkg = ApplicationPackage(
-        batch_id=refs.batch_id,
+        batch_id=target_batch,
         declared_project_id=dp.id,
         current_round=1,
         status="parsing",
