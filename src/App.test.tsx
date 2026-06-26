@@ -7,6 +7,11 @@ vi.mock("./layout/ChatPanel", () => ({
   default: () => <div data-testid="chat-panel-stub" />,
 }));
 
+// 隔离 BatchListPage 的 QueryClient 依赖，聚焦路由切换
+vi.mock("./pages/batch/BatchListPage", () => ({
+  default: () => <div data-testid="batch-list-page" />,
+}));
+
 beforeEach(() => {
   useRouteStore.setState({ nav: { name: "home" } });
 });
