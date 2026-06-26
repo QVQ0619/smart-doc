@@ -417,3 +417,21 @@ class ReviewActionIn(BaseModel):
     final_disposition: Optional[str] = None
     remark: Optional[str] = None
     version: int
+
+
+# —— 项目批次 ——
+class BatchOut(BaseModel):
+    id: int
+    batch_no: str
+    project_type_name: str
+    stage_name: str
+    status: str
+    declare_period: Optional[str] = None
+    material_count: int
+    rule_doc_count: int
+    rule_count: int
+
+
+class BatchCreateIn(BaseModel):
+    batch_no: str
+    declare_period: Optional[str] = None
