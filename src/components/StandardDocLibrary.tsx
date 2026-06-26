@@ -257,7 +257,7 @@ export default function StandardDocLibrary() {
   const qc = useQueryClient();
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const { send } = useChat(activeSessionId ?? "");
-  const [pending, setPending] = useState<{ docId: number; title: string } | null>(null);
+  const [pending, setPending] = useState<{ docId: number; title: string; sawProcessing: boolean } | null>(null);
 
   const listQuery = useQuery({
     queryKey: KEY,
@@ -299,7 +299,7 @@ export default function StandardDocLibrary() {
 
   function onRecognize(row: StandardDoc) {
     if (!activeSessionId) { toast.warning("请先在右侧开始对话"); return; }
-    setPending({ docId: row.id, title: row.title });
+    setPending({ docId: row.id, title: row.title, sawProcessing: false });
     recognizeMut.mutate(row.id);
   }
 
@@ -307,7 +307,11 @@ export default function StandardDocLibrary() {
     if (!pending) return;
     const doc = (listQuery.data ?? []).find((d) => d.id === pending.docId);
     if (!doc) return;
-    if (doc.recognition_status === "done") {
+    if (doc.recognition_status === "processing" && !pending.sawProcessing) {
+      setPending((p) => (p ? { ...p, sawProcessing: true } : p));
+      return;
+    }
+    if (doc.recognition_status === "done" && pending.sawProcessing) {
       if (activeSessionId) {
         send(`请重新抽取规则文件《${pending.title}》(doc_id=${pending.docId}) 的审查规则。`);
         toast.info("已请 AI 重新抽取规则…");

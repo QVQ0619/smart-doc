@@ -59,7 +59,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   // 重置 blade 状态
   _bladeState.activeSessionId = "session-123";
-  mockSend.mockClear();
 
   vi.mocked(api.listStandardDocs).mockResolvedValue([sample] as never);
   vi.mocked(api.deleteStandardDoc).mockResolvedValue();
@@ -108,13 +107,35 @@ test("点重新识别调用 recognizeStandardDoc", async () => {
 });
 
 test("有会话时点重新识别识别完成后自动发 send 命令", async () => {
-  // sample.recognition_status = "done"，点击后 useEffect 立即检测到 done → 调 send
+  // 模拟真实时序：先 processing，再 done；用受控 Promise 精确验证 processing→done 后才发 send
+  const processingDoc = { ...sample, recognition_status: "processing" as const };
+  const doneDoc = { ...sample, recognition_status: "done" as const };
+
+  // doneDeferred 控制第二次 listStandardDocs（invalidation 触发的 refetch）的返回时机
+  let resolveDone!: (v: any) => void;
+  const doneDeferred = new Promise<any>((res) => { resolveDone = res; });
+
+  vi.mocked(api.listStandardDocs)
+    .mockResolvedValueOnce([processingDoc] as never)    // 初始渲染：processing
+    .mockReturnValueOnce(doneDeferred as never)         // invalidation 后 refetch：手动放行
+    .mockResolvedValue([doneDoc] as never);             // 后续轮询
+
   renderLib();
-  await screen.findByText("政策A");
+
+  // 确认文档处于 processing 状态
+  await screen.findByText("识别中");
+
+  // 点击重新识别
   await userEvent.click(screen.getByRole("button", { name: "重新识别" }));
-  // 先等 recognizeStandardDoc 被调
+
+  // recognizeStandardDoc 已被调，且 send 尚未被调（refetch 仍挂起，未见 done）
   await waitFor(() => expect(vi.mocked(api.recognizeStandardDoc)).toHaveBeenCalledWith(1));
-  // 等 send 被调，且参数含 doc_id=1 与 政策A
+  expect(mockSend).not.toHaveBeenCalled();
+
+  // 放行：模拟 processing→done 转换
+  resolveDone([doneDoc]);
+
+  // done 后 send 应被调，且含正确参数
   await waitFor(() => expect(mockSend).toHaveBeenCalled());
   const msg = mockSend.mock.calls[0][0] as string;
   expect(msg).toContain("doc_id=1");
