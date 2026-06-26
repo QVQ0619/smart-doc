@@ -100,13 +100,16 @@ def create_batch(db: Session, body: BatchCreateIn) -> BatchOut:
     if not batch_no:
         raise ValueError("批次号不能为空")
 
+    # ensure_default_master_data 必须先于 batch_no 查重执行：
+    # 它会幂等地建出 __DEFAULT_BATCH__（并 commit），后续查重才能覆盖到该 sentinel，
+    # 从而在空库直接 POST batch_no="__DEFAULT_BATCH__" 时正确返回 ValueError→422 而非 500。
+    refs = ensure_default_master_data(db)
+
     existing = db.execute(
         select(ReviewBatch.id).where(ReviewBatch.batch_no == batch_no)
     ).first()
     if existing is not None:
         raise ValueError(f"批次号已存在: {batch_no}")
-
-    refs = ensure_default_master_data(db)
 
     batch = ReviewBatch(
         batch_no=batch_no,

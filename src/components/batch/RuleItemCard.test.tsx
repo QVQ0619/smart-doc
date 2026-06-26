@@ -81,6 +81,7 @@ test("hard 判定 Tag 渲染红色（color prop）", () => {
   expect(tag).toBeInTheDocument();
   // antd Tag 对非预设颜色使用 inline style（background-color 用 rgb 格式）
   const tagEl = tag.closest(".ant-tag") as HTMLElement | null;
+  expect(tagEl).not.toBeNull();
   if (tagEl) {
     const style = tagEl.getAttribute("style") ?? "";
     // #ff4d4f → rgb(255, 77, 79)
@@ -93,6 +94,7 @@ test("verify 判定 Tag 渲染橙色", () => {
   const tag = screen.getByText("需核验");
   expect(tag).toBeInTheDocument();
   const tagEl = tag.closest(".ant-tag") as HTMLElement | null;
+  expect(tagEl).not.toBeNull();
   if (tagEl) {
     const style = tagEl.getAttribute("style") ?? "";
     // #fa8c16 → rgb(250, 140, 22)
@@ -105,6 +107,7 @@ test("soft 判定 Tag 渲染蓝色", () => {
   const tag = screen.getByText("建议");
   expect(tag).toBeInTheDocument();
   const tagEl = tag.closest(".ant-tag") as HTMLElement | null;
+  expect(tagEl).not.toBeNull();
   if (tagEl) {
     const style = tagEl.getAttribute("style") ?? "";
     // #1677ff → rgb(22, 119, 255)

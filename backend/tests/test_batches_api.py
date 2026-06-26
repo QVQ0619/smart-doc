@@ -130,6 +130,17 @@ def test_default_batch_no_duplicate(client):
     assert r.status_code == 422
 
 
+def test_post_sentinel_directly_on_empty_db_422(client):
+    """空库直接 POST batch_no=__DEFAULT_BATCH__ → 422，不得 500。
+
+    修复 M-B2：create_batch 原先先查重再 ensure_default，导致 ensure_default
+    在查重通过后建出同名 sentinel，后续 insert 触发 IntegrityError → 500。
+    修复后 ensure_default 先执行，查重能覆盖 sentinel，正确返回 422。"""
+    r = _post_batch(client, "__DEFAULT_BATCH__")
+    assert r.status_code == 422, f"预期 422，实际 {r.status_code}：{r.text}"
+    assert "已存在" in r.json()["detail"]
+
+
 # --------------------------------------------------------------------------- #
 # 辅助：上传规则文件
 # --------------------------------------------------------------------------- #
