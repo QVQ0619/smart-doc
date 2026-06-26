@@ -5,6 +5,10 @@ import { resultOf, evidenceLabel } from "./review-grouping";
 
 const BAR: Record<string, string> = { fail: "#ff4d4f", need_review: "#faad14", pass: "#52c41a" };
 const BG: Record<string, string> = { fail: "#fff1f0", need_review: "#fffbe6", pass: "#fff" };
+const SEVERITY: Record<number, { label: string; color: string }> = {
+  3: { label: "高", color: "#ff4d4f" }, 2: { label: "中", color: "#ad6800" }, 1: { label: "低", color: "#86909c" },
+};
+const LOW_CONF = 0.6;
 
 interface FindingCardProps {
   check: ReviewCheck;
@@ -25,10 +29,36 @@ export default function FindingCard({ check, onConfirm, onEvidence, onOverrule }
         borderRadius: "8px 0 0 8px" }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <span style={{ fontWeight: 600, fontSize: 15 }}>{check.name}</span>
-        <span style={{ fontSize: 12, padding: "2px 10px", borderRadius: 999, whiteSpace: "nowrap",
-          border: `1px solid ${bar}`, color: bar }}>机审 {meta.label}</span>
+        {check.status === "overruled" ? (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, color: "#389e0d", fontWeight: 600 }}>
+            <span style={{ color: "#86909c", textDecoration: "line-through", fontWeight: 400 }}>
+              机审 {(RESULT[check.initial_result] ?? { label: check.initial_result }).label}
+            </span>
+            <span style={{ color: "#86909c" }}>→</span>
+            人工 {(RESULT[check.final_result ?? ""] ?? { label: check.final_result }).label}
+          </span>
+        ) : (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, padding: "3px 10px",
+            borderRadius: 999, whiteSpace: "nowrap", border: `1px solid ${bar}`, color: bar }}>
+            机审 {meta.label}
+            {check.confidence != null && (
+              <span style={{ color: "#86909c", borderLeft: "1px solid currentColor", paddingLeft: 8 }}>
+                置信度 {Math.round(check.confidence * 100)}%
+              </span>
+            )}
+            {check.confidence != null && check.confidence < LOW_CONF && (
+              <span style={{ color: "#ad6800", background: "#fffbe6", border: "1px solid #ffe58f",
+                borderRadius: 999, fontSize: 11, padding: "1px 7px" }}>⚠ 建议人工</span>
+            )}
+          </span>
+        )}
       </div>
-      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#86909c", marginTop: 4 }}>{check.rule_code}</div>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 4, fontSize: 12 }}>
+        <span style={{ fontFamily: "monospace", color: "#86909c" }}>{check.rule_code}</span>
+        {check.severity != null && SEVERITY[check.severity] && (
+          <span style={{ color: SEVERITY[check.severity].color }}>● 严重度 {SEVERITY[check.severity].label}</span>
+        )}
+      </div>
       {check.suggestion && <div style={{ fontSize: 14, color: "#4e5969", marginTop: 6 }}>{check.suggestion}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, gap: 10 }}>
         <span onClick={() => onEvidence(check)} style={{ fontSize: 12, color: "#4e5969", cursor: "pointer",
