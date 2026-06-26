@@ -20,14 +20,19 @@ const REVIEW = {
              evidence: [{ segment_id: 5, field_code: null, budget_item_id: null, note: "第1段" }] }],
 };
 
+async function expandFirst(container: HTMLElement) {
+  await waitFor(() => expect(screen.getByText("审查包 #3")).toBeInTheDocument());
+  (container.querySelector(".ant-table-row-expand-icon") as HTMLElement)?.click();
+}
+
 describe("ReviewPanel", () => {
-  it("展开审查包显示结论与审查项", async () => {
+  it("展开审查包显示结论横幅与发现卡片", async () => {
     vi.spyOn(matApi, "listMaterialPackages").mockResolvedValue([PKG] as never);
     vi.spyOn(revApi, "getPackageReview").mockResolvedValue(REVIEW as never);
     const { container } = renderWithQuery(<ReviewPanel />);
-    await waitFor(() => expect(screen.getByText("审查包 #3")).toBeInTheDocument());
-    (container.querySelector(".ant-table-row-expand-icon") as HTMLElement)?.click();
-    await waitFor(() => expect(screen.getByText("必须有申请人")).toBeInTheDocument());
+    await expandFirst(container);
+    await waitFor(() => expect(screen.getByText("建议不予立项")).toBeInTheDocument());
+    expect(screen.getByText("必须有申请人")).toBeInTheDocument();
     expect(screen.getByText("缺申请人")).toBeInTheDocument();
   });
 
@@ -36,11 +41,20 @@ describe("ReviewPanel", () => {
     vi.spyOn(revApi, "getPackageReview").mockResolvedValue(REVIEW as never);
     const spy = vi.spyOn(revApi, "postReviewAction").mockResolvedValue(REVIEW.checks[0] as never);
     const { container } = renderWithQuery(<ReviewPanel />);
-    await waitFor(() => expect(screen.getByText("审查包 #3")).toBeInTheDocument());
-    (container.querySelector(".ant-table-row-expand-icon") as HTMLElement)?.click();
+    await expandFirst(container);
     await waitFor(() => expect(screen.getByText("确认")).toBeInTheDocument());
     fireEvent.click(screen.getByText("确认"));
     await waitFor(() => expect(spy).toHaveBeenCalledWith(9, { action: "confirm", version: 0 }));
+  });
+
+  it("点统计卡按结果筛选", async () => {
+    vi.spyOn(matApi, "listMaterialPackages").mockResolvedValue([PKG] as never);
+    vi.spyOn(revApi, "getPackageReview").mockResolvedValue(REVIEW as never);
+    const { container } = renderWithQuery(<ReviewPanel />);
+    await expandFirst(container);
+    await waitFor(() => expect(screen.getByText("必须有申请人")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("通过").closest("div[data-filter]")!); // 筛"通过"→唯一的 fail 卡片隐藏
+    await waitFor(() => expect(screen.queryByText("必须有申请人")).not.toBeInTheDocument());
   });
 
   it("空状态文案", async () => {
