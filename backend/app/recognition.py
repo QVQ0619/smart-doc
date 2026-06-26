@@ -10,9 +10,10 @@ from sqlalchemy import delete, select
 from sqlmodel import Session
 
 from . import ocr  # OCR 可选模块；通过模块属性访问以便测试 monkeypatch
-from .models import FileObject, ParseSegment, StandardDoc
+from .models import FileObject, ParseSegment, RegulationClause, StandardDoc
 from .schemas import RecognizeResult
 from .storage import FileStorage
+from .structuring import delete_rules_for_doc
 
 MAX_SEGMENT_CHARS = 65536
 
@@ -163,6 +164,9 @@ def recognize_standard_doc(db: Session, storage: FileStorage, doc_id: int) -> Re
     status = "failed"
 
     if drafts and error is None:
+        # 级联清理：先删 review_rule 全链（处理循环 FK），再删 regulation_clause，最后才能删 parse_segment
+        delete_rules_for_doc(db, doc_id)
+        db.execute(delete(RegulationClause).where(RegulationClause.standard_doc_id == doc_id))
         db.execute(delete(ParseSegment).where(ParseSegment.standard_doc_id == doc_id))
         for d in drafts:
             db.add(ParseSegment(
