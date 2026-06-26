@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Table, Tag, Tabs } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useQuery } from "@tanstack/react-query";
 import { listMaterialPackages, listMaterialSegments, getPackageStructured, downloadMaterialFileUrl,
          type MaterialPackage, type MaterialFileBrief, type MaterialSegment } from "../api/materials";
+import FilePreviewModal from "./FilePreviewModal";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "待识别", processing: "识别中", done: "已识别", failed: "识别失败",
@@ -47,17 +49,34 @@ const FILE_COLS: ColumnsType<MaterialFileBrief> = [
     render: (_: unknown, f) => <Tag color={STATUS_COLOR[f.recognition_status] ?? "default"}>
       {STATUS_LABEL[f.recognition_status] ?? f.recognition_status}</Tag> },
   { title: "段落数", dataIndex: "segment_count", key: "segment_count", width: 90 },
-  { title: "原文件", key: "view", width: 110,
-    render: (_: unknown, f: MaterialFileBrief) => (
-      <a href={downloadMaterialFileUrl(f.material_file_id)} target="_blank" rel="noreferrer">查看原文件</a>
-    ) },
 ];
 
 function PackageFiles({ pkg }: { pkg: MaterialPackage }) {
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
+
+  const viewCol: ColumnsType<MaterialFileBrief>[number] = {
+    title: "原文件", key: "view", width: 110,
+    render: (_: unknown, f: MaterialFileBrief) => (
+      <a onClick={() => setPreview({ url: downloadMaterialFileUrl(f.material_file_id), name: f.file_name })}>
+        查看原文件
+      </a>
+    ),
+  };
+
+  const columns: ColumnsType<MaterialFileBrief> = [...FILE_COLS, viewCol];
+
   return (
-    <Table rowKey="material_file_id" size="small" dataSource={pkg.files} columns={FILE_COLS}
-      pagination={false}
-      expandable={{ expandedRowRender: (f) => <FileSegments id={f.material_file_id} /> }} />
+    <>
+      <Table rowKey="material_file_id" size="small" dataSource={pkg.files} columns={columns}
+        pagination={false}
+        expandable={{ expandedRowRender: (f) => <FileSegments id={f.material_file_id} /> }} />
+      <FilePreviewModal
+        open={!!preview}
+        url={preview?.url ?? null}
+        fileName={preview?.name ?? ""}
+        onClose={() => setPreview(null)}
+      />
+    </>
   );
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tabs, Tag } from "antd";
+import FilePreviewModal from "./FilePreviewModal";
 import type { ColumnsType } from "antd/es/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -258,6 +259,7 @@ export default function StandardDocLibrary() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const { send } = useChat(activeSessionId ?? "");
   const [pending, setPending] = useState<{ docId: number; title: string; sawProcessing: boolean } | null>(null);
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
 
   const listQuery = useQuery({
     queryKey: KEY,
@@ -348,7 +350,7 @@ export default function StandardDocLibrary() {
       key: "actions",
       render: (_: unknown, row: StandardDoc) => (
         <Space>
-          <a href={downloadStandardDocUrl(row.id)} target="_blank" rel="noreferrer">
+          <a onClick={() => setPreview({ url: downloadStandardDocUrl(row.id), name: row.file_name })}>
             查看原文件
           </a>
           <Button
@@ -383,6 +385,12 @@ export default function StandardDocLibrary() {
         columns={columns}
         pagination={false}
         expandable={{ expandedRowRender: (row: StandardDoc) => <DocExpand docId={row.id} /> }}
+      />
+      <FilePreviewModal
+        open={!!preview}
+        url={preview?.url ?? null}
+        fileName={preview?.name ?? ""}
+        onClose={() => setPreview(null)}
       />
     </div>
   );

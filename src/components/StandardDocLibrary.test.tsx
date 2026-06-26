@@ -367,3 +367,14 @@ test("文档初始为 failed 时重新识别不触发假失败，processing→do
 
   errorSpy.mockRestore();
 });
+
+test("点击查看原文件→预览弹窗出现(PDF 显示 iframe)", async () => {
+  renderLib();
+  await screen.findByText("政策A");
+  await userEvent.click(screen.getByText("查看原文件"));
+  await waitFor(() => {
+    const iframe = document.body.querySelector("iframe");
+    expect(iframe).toBeTruthy();
+    expect(iframe?.getAttribute("src")).toBe("/api/standard-docs/1/download");
+  });
+});
