@@ -444,6 +444,14 @@ class ReviewBatch(SQLModel, table=True):
     created_at: Optional[datetime] = _dt(nullable=False, now=True)
 
 
+class BatchRuleDoc(SQLModel, table=True):
+    __tablename__ = "batch_rule_doc"
+    id: Optional[int] = _pk()
+    batch_id: int = _fk("review_batch.id", nullable=False)
+    standard_doc_id: int = _fk("standard_doc.id", nullable=False)
+    created_at: Optional[datetime] = _dt(nullable=False, now=True)
+
+
 class ApplicationPackage(SQLModel, table=True):
     __tablename__ = "application_package"
     id: Optional[int] = _pk()
@@ -766,7 +774,7 @@ __all__ = [
     "WritingParadigm", "ParadigmFinding",
     "SecrecyLevel", "SecurityQualLevel", "SecrecyQualMap", "ApplicationCode",
     "ResearchUnit", "ResearchPerson", "PersonHolding", "IntegrityRecord",
-    "DeclaredProject", "ReviewBatch", "ApplicationPackage",
+    "DeclaredProject", "ReviewBatch", "BatchRuleDoc", "ApplicationPackage",
     "MaterialFile", "ParseSegment", "ExtractedField", "PackageMember",
     "PackageCoopUnit", "BudgetItem", "PackageAttachment",
     "ReviewRound", "RoundCheck", "CheckReviewAction", "FindingEvidence", "ReviewReport",

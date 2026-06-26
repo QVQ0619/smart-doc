@@ -87,6 +87,7 @@ def client(_test_db, storage_dir):
         s.execute(text("DELETE FROM parse_segment"))
         s.execute(text("DELETE FROM material_file"))
         s.execute(text("DELETE FROM application_package"))
+        s.execute(text("DELETE FROM batch_rule_doc"))
         s.execute(text("DELETE FROM review_batch"))
         s.execute(text("DELETE FROM declared_project"))
         s.execute(text("DELETE FROM standard_doc"))
