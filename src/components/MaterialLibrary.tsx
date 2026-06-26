@@ -57,7 +57,8 @@ function PackageFiles({ pkg }: { pkg: MaterialPackage }) {
   const viewCol: ColumnsType<MaterialFileBrief>[number] = {
     title: "原文件", key: "view", width: 110,
     render: (_: unknown, f: MaterialFileBrief) => (
-      <a onClick={() => setPreview({ url: downloadMaterialFileUrl(f.material_file_id), name: f.file_name })}>
+      <a style={{ cursor: "pointer" }}
+         onClick={() => setPreview({ url: downloadMaterialFileUrl(f.material_file_id), name: f.file_name })}>
         查看原文件
       </a>
     ),

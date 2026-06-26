@@ -350,7 +350,8 @@ export default function StandardDocLibrary() {
       key: "actions",
       render: (_: unknown, row: StandardDoc) => (
         <Space>
-          <a onClick={() => setPreview({ url: downloadStandardDocUrl(row.id), name: row.file_name })}>
+          <a style={{ cursor: "pointer" }}
+             onClick={() => setPreview({ url: downloadStandardDocUrl(row.id), name: row.file_name })}>
             查看原文件
           </a>
           <Button
