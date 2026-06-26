@@ -342,3 +342,70 @@ class ReviewInput(BaseModel):
     attachments: list[AttachmentOut]
     fields: list[FieldOut]
     segments: list[MaterialFileSegmentsOut]
+
+
+# —— 形式审查·机审落库(Task 3) ——
+class EvidenceIn(BaseModel):
+    segment_id: Optional[int] = None
+    field_code: Optional[str] = None
+    budget_item_id: Optional[int] = None
+    note: Optional[str] = None
+
+
+class CheckIn(BaseModel):
+    rule_version_id: int
+    initial_result: str
+    initial_disposition: Optional[str] = None
+    suggestion: Optional[str] = None
+    confidence: Optional[float] = None
+    severity: Optional[int] = None
+    evidence: list[EvidenceIn] = []
+
+
+class ReviewApplyIn(BaseModel):
+    checks: list[CheckIn]
+
+
+class ReviewApplyResult(BaseModel):
+    round_id: int
+    round_no: int
+    conclusion: str
+    checks_written: int
+    evidence_written: int
+
+
+class EvidenceOut(BaseModel):
+    segment_id: Optional[int]
+    field_code: Optional[str]
+    budget_item_id: Optional[int]
+    note: Optional[str]
+
+
+class CheckOut(BaseModel):
+    round_check_id: int
+    rule_version_id: int
+    rule_code: str
+    name: str
+    dimension_code: str
+    initial_result: str
+    initial_disposition: Optional[str]
+    final_result: Optional[str]
+    final_disposition: Optional[str]
+    effective_result: str
+    status: str
+    suggestion: Optional[str]
+    confidence: Optional[float]
+    severity: Optional[int]
+    version: int
+    evidence: list[EvidenceOut]
+
+
+class RoundOut(BaseModel):
+    round_id: int
+    round_no: int
+    conclusion: str
+
+
+class ReviewResultOut(BaseModel):
+    round: Optional[RoundOut]
+    checks: list[CheckOut]
