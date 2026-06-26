@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Collapse, Button, Tag } from "antd";
 import type { ReviewCheck } from "../../api/review";
 import type { DimensionGroupData } from "./review-grouping";
@@ -17,6 +18,18 @@ interface DimensionGroupProps {
 export default function DimensionGroup(
   { group, filter, onConfirm, onEvidence, onOverrule, onConfirmGroup }: DimensionGroupProps,
 ) {
+  const [activeKeys, setActiveKeys] = useState<string[]>(group.hasProblem ? [group.code] : []);
+
+  useEffect(() => {
+    if (filter === null) {
+      // 无筛选：恢复默认（问题组展开，全通过组折叠）
+      setActiveKeys(group.hasProblem ? [group.code] : []);
+    } else if (group.checks.some((c) => resultOf(c) === filter)) {
+      // 本组有匹配卡片：自动展开
+      setActiveKeys([group.code]);
+    }
+  }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const visible = group.checks.filter((c) => !filter || resultOf(c) === filter);
   const header = (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
@@ -27,7 +40,8 @@ export default function DimensionGroup(
     </span>
   );
   return (
-    <Collapse style={{ marginTop: 14 }} defaultActiveKey={group.hasProblem ? [group.code] : []}
+    <Collapse style={{ marginTop: 14 }} activeKey={activeKeys}
+      onChange={(k) => setActiveKeys(k as string[])}
       items={[{
         key: group.code, label: header,
         extra: (

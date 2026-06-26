@@ -11,7 +11,6 @@ export default function VerdictBanner(
 ) {
   const cc = CONCLUSION[conclusion] ?? { label: conclusion, color: "default" };
   const color = COLOR[cc.color] ?? COLOR.default;
-  const ruleTotal = counts.pass + counts.fail + counts.need_review + counts.not_applicable;
   const pct = total ? Math.round((reviewed / total) * 100) : 0;
   return (
     <div style={{ position: "relative", borderRadius: 12, padding: "16px 20px 16px 24px",
@@ -20,7 +19,7 @@ export default function VerdictBanner(
         borderRadius: "12px 0 0 12px" }} />
       <div style={{ fontSize: 22, fontWeight: 700, color }}>{cc.label}</div>
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 10, fontSize: 13 }}>
-        <span style={{ color: "#86909c" }}>共 {ruleTotal} 条规则</span>
+        <span style={{ color: "#86909c" }}>共 {total} 条规则</span>
         <span>{counts.pass} 通过</span>
         <span>{counts.fail} 不通过</span>
         <span>{counts.need_review} 待复核</span>

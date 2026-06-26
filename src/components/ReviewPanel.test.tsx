@@ -76,4 +76,34 @@ describe("ReviewPanel", () => {
     fireEvent.click(screen.getByText(/段落#5/));
     await waitFor(() => expect(screen.getByText(/申请人原文片段/)).toBeInTheDocument());
   });
+
+  // FIX 1 回归：点「通过」统计卡后，全通过维度组自动展开，其通过卡片变为可见
+  it("点通过统计卡自动展开全通过维度组", async () => {
+    // fixture：compliance 组有 fail 项（默认展开）；completeness 组全 pass（默认折叠，hasProblem=false）
+    const REVIEW_MULTI = {
+      round: { round_id: 1, round_no: 1, conclusion: "reject" },
+      checks: [
+        { round_check_id: 1, rule_version_id: 1, rule_code: "R-1", name: "合规失败项",
+          dimension_code: "compliance", initial_result: "fail", initial_disposition: "reject",
+          final_result: null, final_disposition: null, effective_result: "fail", status: "open",
+          suggestion: null, confidence: null, severity: null, version: 0, evidence: [] },
+        { round_check_id: 2, rule_version_id: 2, rule_code: "R-2", name: "完整性通过项",
+          dimension_code: "completeness", initial_result: "pass", initial_disposition: null,
+          final_result: null, final_disposition: null, effective_result: "pass", status: "open",
+          suggestion: null, confidence: null, severity: null, version: 0, evidence: [] },
+      ],
+    };
+    vi.spyOn(matApi, "listMaterialPackages").mockResolvedValue([PKG] as never);
+    vi.spyOn(revApi, "getPackageReview").mockResolvedValue(REVIEW_MULTI as never);
+    const { container } = renderWithQuery(<ReviewPanel />);
+    await expandFirst(container);
+    // 初始：completeness 组折叠，"完整性通过项"不可见
+    await waitFor(() => expect(screen.getByText("合规失败项")).toBeInTheDocument());
+    expect(screen.queryByText("完整性通过项")).not.toBeInTheDocument();
+    // 点「通过」统计卡
+    fireEvent.click(screen.getByText("通过").closest("div[data-filter]")!);
+    // 预期：全通过组自动展开，"完整性通过项" 可见；fail 组隐藏（无 pass 卡片故被过滤掉）
+    await waitFor(() => expect(screen.getByText("完整性通过项")).toBeInTheDocument());
+    expect(screen.queryByText("合规失败项")).not.toBeInTheDocument();
+  });
 });

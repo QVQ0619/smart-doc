@@ -5,7 +5,7 @@ import { getPackageReview, postReviewAction,
          type ReviewCheck, type PackageReview } from "../../api/review";
 import { getPackageSegments, getPackageStructured } from "../../api/materials";
 import { type ResultKey } from "./review-constants";
-import { groupByDimension, countChecks, type DimensionGroupData } from "./review-grouping";
+import { groupByDimension, countChecks, resultOf, type DimensionGroupData } from "./review-grouping";
 import VerdictBanner from "./VerdictBanner";
 import StatCards from "./StatCards";
 import DimensionGroup from "./DimensionGroup";
@@ -40,14 +40,14 @@ export default function ReviewWorkbench({ packageId }: { packageId: number }) {
 
   const confirm = (c: ReviewCheck) => mut.mutate({ id: c.round_check_id, body: { action: "confirm", version: c.version } });
   const confirmGroup = (g: DimensionGroupData) =>
-    g.checks.filter((c) => c.status === "open" && (c.final_result ?? c.effective_result ?? c.initial_result) === "pass")
+    g.checks.filter((c) => c.status === "open" && resultOf(c) === "pass")
       .forEach(confirm);
 
   return (
     <div>
       <VerdictBanner conclusion={data.round.conclusion} counts={counts} reviewed={reviewed} total={checks.length} />
       <StatCards counts={counts} active={filter} onToggle={(k) => setFilter(filter === k ? null : k)} />
-      {groups.map((g) => (
+      {groups.filter((g) => !filter || g.checks.some((c) => resultOf(c) === filter)).map((g) => (
         <DimensionGroup key={g.code} group={g} filter={filter}
           onConfirm={confirm} onEvidence={setEvidence}
           onOverrule={setOverrule}
