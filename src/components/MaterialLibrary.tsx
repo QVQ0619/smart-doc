@@ -4,6 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useQuery } from "@tanstack/react-query";
 import { listMaterialPackages, listMaterialSegments, getPackageStructured, downloadMaterialFileUrl,
          type MaterialPackage, type MaterialFileBrief, type MaterialSegment } from "../api/materials";
+import { listBatchPackages } from "../api/batches";
 import FilePreviewModal from "./FilePreviewModal";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -147,8 +148,11 @@ const PKG_COLS: ColumnsType<MaterialPackage> = [
   { title: "材料数", dataIndex: "file_count", key: "file_count", width: 100 },
 ];
 
-export default function MaterialLibrary() {
-  const q = useQuery({ queryKey: ["material-packages"], queryFn: listMaterialPackages });
+export default function MaterialLibrary({ batchId }: { batchId?: number } = {}) {
+  const q = useQuery({
+    queryKey: batchId != null ? ["material-packages", batchId] : ["material-packages"],
+    queryFn: () => (batchId != null ? listBatchPackages(batchId) : listMaterialPackages()),
+  });
   if (q.isError) return <div>审查材料加载失败</div>;
   return (
     <Table rowKey="package_id" size="middle" loading={q.isLoading} dataSource={q.data ?? []}

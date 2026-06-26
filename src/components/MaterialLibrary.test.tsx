@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import MaterialLibrary from "./MaterialLibrary";
 import * as api from "../api/materials";
+import * as batchesApi from "../api/batches";
 
 function renderWithQuery(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -42,6 +43,18 @@ describe("MaterialLibrary", () => {
     expect(expandBtn).toBeTruthy();
     expandBtn.click();
     await waitFor(() => expect(screen.getByText("张三")).toBeInTheDocument());
+  });
+
+  it("传 batchId → 调用 listBatchPackages 而非 listMaterialPackages", async () => {
+    const batchPkgSpy = vi
+      .spyOn(batchesApi, "listBatchPackages")
+      .mockResolvedValue([]);
+    const globalPkgSpy = vi
+      .spyOn(api, "listMaterialPackages")
+      .mockResolvedValue([]);
+    renderWithQuery(<MaterialLibrary batchId={7} />);
+    await waitFor(() => expect(batchPkgSpy).toHaveBeenCalledWith(7));
+    expect(globalPkgSpy).not.toHaveBeenCalled();
   });
 
   it("展开文件列表点击查看原文件→预览弹窗出现(docx 回退)", async () => {

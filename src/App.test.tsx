@@ -12,6 +12,13 @@ vi.mock("./pages/batch/BatchListPage", () => ({
   default: () => <div data-testid="batch-list-page" />,
 }));
 
+// 隔离 BatchDetailPage 的 QueryClient 依赖，聚焦路由切换
+vi.mock("./pages/batch/BatchDetailPage", () => ({
+  default: ({ batchId }: { batchId: number }) => (
+    <div data-testid="batch-detail-page">批次详情 #{batchId}</div>
+  ),
+}));
+
 beforeEach(() => {
   useRouteStore.setState({ nav: { name: "home" } });
 });
