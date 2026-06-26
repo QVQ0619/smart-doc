@@ -9,6 +9,8 @@ export interface StandardDoc {
   recognition_status: string;
   segment_count?: number | null;
   page_count?: number | null;
+  clause_count?: number | null;
+  rule_count?: number | null;
 }
 
 export interface RecognizeResult {

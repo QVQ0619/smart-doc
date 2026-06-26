@@ -152,4 +152,26 @@ describe("BatchDetailPage", () => {
     await userEvent.click(screen.getByText("项目批次"));
     expect(useRouteStore.getState().nav).toMatchObject({ name: "batch-list" });
   });
+
+  it("规则库 Tab 卡片显示 clause_count 和 rule_count 计数", async () => {
+    const detailWithCounts = {
+      ...mockDetail,
+      rule_docs: [
+        {
+          ...mockDetail.rule_docs[0],
+          clause_count: 17,
+          rule_count: 23,
+        },
+        mockDetail.rule_docs[1],
+      ],
+    };
+    vi.spyOn(batchApi, "getBatchDetail").mockResolvedValue(detailWithCounts);
+    renderWithQuery(<BatchDetailPage batchId={5} batchTitle="B-2026-05" />);
+    await waitFor(() =>
+      expect(screen.getByText("规则文件A")).toBeInTheDocument(),
+    );
+    // RuleDocCard 渲染 <b>17</b>条款 和 <b>23</b>规则
+    expect(screen.getByText("17")).toBeInTheDocument();
+    expect(screen.getByText("23")).toBeInTheDocument();
+  });
 });

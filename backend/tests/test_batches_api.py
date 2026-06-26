@@ -285,6 +285,68 @@ def test_batch_standard_docs_empty(client):
 # GET /api/batches/{id}/packages 材料包子集
 # --------------------------------------------------------------------------- #
 
+def test_batch_standard_docs_clause_and_rule_counts(client):
+    """GET /batches/{id}/standard-docs 返回 clause_count 和 rule_count 计数。
+    建批次 + 1 个 doc → 写 3 条 RegulationClause + 通过 API 建 2 条规则 → 绑定 → 验证计数。"""
+    from sqlalchemy import select as sa_select
+    from sqlmodel import Session
+    from app.db import engine
+    from app.models import RegulationClause, StandardDoc
+
+    # 建批次 + 上传 1 个规则文件
+    batch_id = _post_batch(client, "COUNTS-DOCS").json()["id"]
+    doc_id = _upload_standard_doc(client, "规则D.pdf")
+
+    # 读取 doc_code（规则 API 需要通过 clause 绑定到 doc）
+    with Session(engine) as s:
+        doc_code = s.execute(
+            sa_select(StandardDoc.doc_code).where(StandardDoc.id == doc_id)
+        ).scalar_one()
+
+    # 直接向 DB 写 3 条 RegulationClause
+    with Session(engine) as s:
+        for i in range(3):
+            s.add(RegulationClause(
+                standard_doc_id=doc_id,
+                doc_code=doc_code,
+                clause_no=f"第{i + 1}条",
+            ))
+        s.commit()
+
+    # 获取第 1 条 clause_id，用于通过 API 建规则
+    with Session(engine) as s:
+        clause_id = s.execute(
+            sa_select(RegulationClause.id)
+            .where(RegulationClause.standard_doc_id == doc_id)
+            .limit(1)
+        ).scalar_one()
+
+    # 通过 API 加 2 条规则（维度已由 ensure_dimensions 在启动时注入）
+    r_rules = client.post(f"/api/standard-docs/{doc_id}/rules", json={"rules": [
+        {"source_clause_id": clause_id, "dimension_code": "compliance",
+         "name": "规则1", "logic": "l", "decision_type": "hard",
+         "disposition": "reject", "binding_class": "common"},
+        {"source_clause_id": clause_id, "dimension_code": "completeness",
+         "name": "规则2", "logic": "l", "decision_type": "soft",
+         "disposition": "fix", "binding_class": "common"},
+    ]})
+    assert r_rules.status_code == 200, r_rules.text
+
+    # 绑定 doc 到批次
+    rb = client.post(f"/api/batches/{batch_id}/bind-rule-docs",
+                     json={"standard_doc_ids": [doc_id]})
+    assert rb.status_code == 200
+
+    # 验证子集端点返回 clause_count 和 rule_count
+    r = client.get(f"/api/batches/{batch_id}/standard-docs")
+    assert r.status_code == 200
+    docs = r.json()
+    assert len(docs) == 1
+    doc = docs[0]
+    assert doc["clause_count"] == 3, f"期望 clause_count=3，实际: {doc}"
+    assert doc["rule_count"] == 2, f"期望 rule_count=2，实际: {doc}"
+
+
 def test_batch_packages_empty(client):
     """空批次，packages 子集端点返回 []。"""
     batch_id = _post_batch(client, "PKGS-EMPTY").json()["id"]

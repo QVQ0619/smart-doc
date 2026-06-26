@@ -96,6 +96,8 @@ export default function BatchDetailPage({ batchId, batchTitle }: Props) {
         title={doc.title}
         recognitionStatus={doc.recognition_status}
         segmentCount={doc.segment_count}
+        clauseCount={doc.clause_count}
+        ruleCount={doc.rule_count}
         sizeText={doc.size_bytes != null ? humanSize(doc.size_bytes) : undefined}
         uploadedAt={doc.created_at}
         actions={

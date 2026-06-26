@@ -139,7 +139,8 @@ def create_batch(db: Session, body: BatchCreateIn) -> BatchOut:
 def list_batch_standard_docs(db: Session, batch_id: int) -> list[StandardDocOut]:
     """返回该批次绑定的规则文件列表（StandardDocOut），口径同 standard_docs.list_standard_docs：
     join FileObject，is_active & deleted_at IS NULL，按 created_at desc, id desc 排序。
-    绑定为空 → []。"""
+    绑定为空 → []。
+    额外填充 clause_count / rule_count（rule_count 口径与 config_packages 一致）。"""
     doc_ids = list_batch_rule_docs(db, batch_id)
     if not doc_ids:
         return []
@@ -153,6 +154,33 @@ def list_batch_standard_docs(db: Session, batch_id: int) -> list[StandardDocOut]
         )
         .order_by(StandardDoc.created_at.desc(), StandardDoc.id.desc())
     ).all()
+
+    # clause_count：每 doc 的 RegulationClause 行数（一次批量查询）
+    clause_rows = db.execute(
+        select(RegulationClause.standard_doc_id, func.count(RegulationClause.id))
+        .where(RegulationClause.standard_doc_id.in_(doc_ids))
+        .group_by(RegulationClause.standard_doc_id)
+    ).all()
+    clause_map: dict[int, int] = {r[0]: r[1] for r in clause_rows}
+
+    # rule_count：口径与 config_packages.list_config_packages 完全一致
+    # （StandardDoc→RegulationClause→ReviewRuleClause→ReviewRuleVersion→ReviewRule，
+    #   is_active 双过滤，distinct review_rule.id，按 doc 分组）
+    rule_rows = db.execute(
+        select(StandardDoc.id, func.count(distinct(ReviewRule.id)))
+        .join(RegulationClause, RegulationClause.standard_doc_id == StandardDoc.id)
+        .join(ReviewRuleClause, ReviewRuleClause.clause_id == RegulationClause.id)
+        .join(ReviewRuleVersion, ReviewRuleVersion.id == ReviewRuleClause.rule_version_id)
+        .join(ReviewRule, ReviewRule.current_version_id == ReviewRuleVersion.id)
+        .where(
+            StandardDoc.id.in_(doc_ids),
+            StandardDoc.is_active == True,   # noqa: E712
+            ReviewRule.is_active == True,    # noqa: E712
+        )
+        .group_by(StandardDoc.id)
+    ).all()
+    rule_map: dict[int, int] = {r[0]: r[1] for r in rule_rows}
+
     return [
         StandardDocOut(
             id=sd.id,
@@ -163,6 +191,8 @@ def list_batch_standard_docs(db: Session, batch_id: int) -> list[StandardDocOut]
             mime_type=fo.mime_type,
             created_at=sd.created_at,
             recognition_status=sd.recognition_status,
+            clause_count=clause_map.get(sd.id, 0),
+            rule_count=rule_map.get(sd.id, 0),
         )
         for sd, fo in rows
     ]

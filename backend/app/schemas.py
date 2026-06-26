@@ -16,6 +16,8 @@ class StandardDocOut(BaseModel):
     segment_count: Optional[int] = None
     page_count: Optional[int] = None
     status: Optional[str] = None          # 上传场景: created | reused
+    clause_count: Optional[int] = None   # 批次子集端点填充；全局列表保持 None
+    rule_count: Optional[int] = None     # 批次子集端点填充；全局列表保持 None
 
 
 class FailedItem(BaseModel):
