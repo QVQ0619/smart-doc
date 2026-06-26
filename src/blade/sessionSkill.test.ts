@@ -11,7 +11,7 @@ vi.mock("@blade-hq/agent-kit/react", () => ({
 const toast = vi.hoisted(() => ({ warning: vi.fn(), success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-import { pushRuleDocSkill, pushMaterialDocSkill } from "./sessionSkill";
+import { pushRuleDocSkill, pushMaterialDocSkill, pushReviewSkill } from "./sessionSkill";
 
 type FileEntry = { path: string; content: string };
 
@@ -77,4 +77,11 @@ test("pushMaterialDocSkill 推送 save-material-doc 与 extract-material-structu
   const names = uploadSessionSkill.mock.calls.map((c) => (c[1] as { name: string }).name);
   expect(names).toContain("local/save-material-doc");
   expect(names).toContain("local/extract-material-structure");
+});
+
+test("pushReviewSkill 推送 review-package", async () => {
+  uploadSessionSkill.mockReset().mockResolvedValue({ skill_dir: "/x", file_count: 1 } as never);
+  await pushReviewSkill("sess-1");
+  const names = uploadSessionSkill.mock.calls.map((c) => (c[1] as { name: string }).name);
+  expect(names).toContain("local/review-package");
 });

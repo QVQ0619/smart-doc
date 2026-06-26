@@ -10,11 +10,15 @@ import MATERIAL_PY from "../../blade/skills/shared/helpers/smart_doc_material.py
 import EXTRACT_MATERIAL_SKILL_MD from "../../blade/skills/extract-material-structure/versions/1.0.0/SKILL.md?raw";
 import PKG_SEGMENTS_PY from "../../blade/skills/shared/helpers/smart_doc_pkg_segments.py?raw";
 import EXTRACT_PY from "../../blade/skills/shared/helpers/smart_doc_extract.py?raw";
+import REVIEW_SKILL_MD from "../../blade/skills/review-package/versions/1.0.0/SKILL.md?raw";
+import REVIEW_INPUT_PY from "../../blade/skills/shared/helpers/smart_doc_review_input.py?raw";
+import REVIEW_PY from "../../blade/skills/shared/helpers/smart_doc_review.py?raw";
 
 const SAVE_SKILL_NAME = "local/save-rule-doc";
 const EXTRACT_RULES_SKILL_NAME = "local/extract-rules";
 const SAVE_MATERIAL_SKILL_NAME = "local/save-material-doc";
 const EXTRACT_MATERIAL_SKILL_NAME = "local/extract-material-structure";
+const REVIEW_SKILL_NAME = "local/review-package";
 
 type FileEntry = { path: string; content: string };
 
@@ -89,6 +93,22 @@ export async function pushMaterialDocSkill(sessionId: string): Promise<void> {
     { path: "SKILL.md", content: EXTRACT_MATERIAL_SKILL_MD },
     { path: "scripts/smart_doc_pkg_segments.py", content: PKG_SEGMENTS_PY },
     { path: "scripts/smart_doc_extract.py", content: EXTRACT_PY },
+    { path: "scripts/api_base.txt", content: apiBase ?? "" },
+    { path: "scripts/api_key.txt", content: apiKey ?? "" },
+  ]);
+}
+
+/**
+ * 把形式审查技能推送到会话(agent 沙箱):review-package 依 hard 规则逐条机审申报包。
+ * best-effort:失败只 toast.warning,不抛出阻断聊天。
+ */
+export async function pushReviewSkill(sessionId: string): Promise<void> {
+  const apiBase = getSmartDocApi();
+  const apiKey = getSmartDocApiKey();
+  await pushOne(sessionId, REVIEW_SKILL_NAME, [
+    { path: "SKILL.md", content: REVIEW_SKILL_MD },
+    { path: "scripts/smart_doc_review_input.py", content: REVIEW_INPUT_PY },
+    { path: "scripts/smart_doc_review.py", content: REVIEW_PY },
     { path: "scripts/api_base.txt", content: apiBase ?? "" },
     { path: "scripts/api_key.txt", content: apiKey ?? "" },
   ]);
