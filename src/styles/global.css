@@ -18,10 +18,15 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 220px 1fr 380px;
+  grid-template-columns: var(--menu-col, 220px) 1fr var(--chat-col, 380px);
   height: 100vh;
   overflow: hidden;
 }
+
+.app-shell--menu-collapsed {
+  --menu-col: 48px;
+}
+
 
 .app-shell__menu {
   height: 100vh;
@@ -50,7 +55,7 @@ body {
 
 /* 右栏折叠态：列宽收窄为竖条 */
 .app-shell--chat-collapsed {
-  grid-template-columns: 220px 1fr 48px;
+  --chat-col: 48px;
 }
 
 .chat-rail {
@@ -63,6 +68,22 @@ body {
 }
 
 .chat-rail__label {
+  writing-mode: vertical-rl;
+  letter-spacing: 2px;
+  color: #86909c;
+  font-size: 13px;
+}
+
+.menu-rail {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.menu-rail__label {
   writing-mode: vertical-rl;
   letter-spacing: 2px;
   color: #86909c;
