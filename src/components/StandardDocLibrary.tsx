@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tabs, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ import {
   type Rule,
   type RuleUpdate,
 } from "../api/standardDocs";
+import { useSessionStore, useChat } from "@blade-hq/agent-kit/react";
 
 function humanSize(bytes: number | null): string {
   if (bytes == null) return "-";
@@ -147,8 +148,6 @@ const RULE_COLS: ColumnsType<Rule> = [
     render: (_: unknown, r: Rule) => <Tag>{DECISION_LABEL[r.decision_type] ?? r.decision_type}</Tag> },
   { title: "处置", key: "disposition", width: 90,
     render: (_: unknown, r: Rule) => <Tag>{DISPOSITION_LABEL[r.disposition] ?? r.disposition}</Tag> },
-  { title: "绑定", key: "binding", width: 90,
-    render: (_: unknown, r: Rule) => <Tag>{BINDING_LABEL[r.binding_class] ?? r.binding_class}</Tag> },
   { title: "出处", key: "prov", width: 160,
     render: (_: unknown, r: Rule) => ruleProvenance(r) },
 ];
@@ -256,6 +255,9 @@ function DocExpand({ docId }: { docId: number }) {
 
 export default function StandardDocLibrary() {
   const qc = useQueryClient();
+  const activeSessionId = useSessionStore((s) => s.activeSessionId);
+  const { send } = useChat(activeSessionId ?? "");
+  const [pending, setPending] = useState<{ docId: number; title: string } | null>(null);
 
   const listQuery = useQuery({
     queryKey: KEY,
@@ -295,6 +297,28 @@ export default function StandardDocLibrary() {
     onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
   });
 
+  function onRecognize(row: StandardDoc) {
+    if (!activeSessionId) { toast.warning("请先在右侧开始对话"); return; }
+    setPending({ docId: row.id, title: row.title });
+    recognizeMut.mutate(row.id);
+  }
+
+  useEffect(() => {
+    if (!pending) return;
+    const doc = (listQuery.data ?? []).find((d) => d.id === pending.docId);
+    if (!doc) return;
+    if (doc.recognition_status === "done") {
+      if (activeSessionId) {
+        send(`请重新抽取规则文件《${pending.title}》(doc_id=${pending.docId}) 的审查规则。`);
+        toast.info("已请 AI 重新抽取规则…");
+      }
+      setPending(null);
+    } else if (doc.recognition_status === "failed") {
+      toast.error("重新识别失败,未触发抽取");
+      setPending(null);
+    }
+  }, [listQuery.data, pending, activeSessionId, send]);
+
   const columns: ColumnsType<StandardDoc> = [
     { title: "标题", dataIndex: "title", key: "title" },
     { title: "文件名", dataIndex: "file_name", key: "file_name" },
@@ -325,7 +349,7 @@ export default function StandardDocLibrary() {
           <Button
             type="link"
             loading={recognizeMut.isPending && recognizeMut.variables === row.id}
-            onClick={() => recognizeMut.mutate(row.id)}
+            onClick={() => onRecognize(row)}
           >
             重新识别
           </Button>

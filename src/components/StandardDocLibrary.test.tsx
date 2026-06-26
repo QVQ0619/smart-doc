@@ -3,6 +3,26 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StandardDocLibrary from "./StandardDocLibrary";
 import * as api from "../api/standardDocs";
+import { toast } from "sonner";
+
+// --- Blade SDK mock ---
+// vi.hoisted 确保变量在 vi.mock 工厂函数执行前已初始化
+const mockSend = vi.hoisted(() => vi.fn());
+const _bladeState = vi.hoisted(() => ({
+  activeSessionId: "session-123" as string | null,
+}));
+
+vi.mock("@blade-hq/agent-kit/react", () => ({
+  useSessionStore: (selector: (s: { activeSessionId: string | null }) => unknown) =>
+    selector({ activeSessionId: _bladeState.activeSessionId }),
+  useChat: (_sessionId: string) => ({
+    send: mockSend,
+    messages: [],
+    isStreaming: false,
+    isStopping: false,
+    stop: () => Promise.resolve(),
+  }),
+}));
 
 vi.mock("../api/standardDocs", async () => {
   const actual = await vi.importActual<typeof api>("../api/standardDocs");
@@ -36,10 +56,15 @@ const sample = {
 };
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  // 重置 blade 状态
+  _bladeState.activeSessionId = "session-123";
+  mockSend.mockClear();
+
   vi.mocked(api.listStandardDocs).mockResolvedValue([sample] as never);
   vi.mocked(api.deleteStandardDoc).mockResolvedValue();
   vi.mocked(api.recognizeStandardDoc).mockResolvedValue({
-    doc_id: 1, doc_code: "SD-abc", recognition_status: "done", segment_count: 9, page_count: 2, error: null,
+    doc_id: 1, doc_code: "SD-abc", recognition_status: "processing", segment_count: 9, page_count: 2, error: null,
   } as never);
   vi.mocked(api.listClauses).mockResolvedValue([
     { id: 1, clause_no: "第一条", clause_text: "申请人应当具有高级职称。", source_segment_id: 5, page_no: 2, locator: { page: 2, block_index: 1 } },
@@ -80,6 +105,33 @@ test("点重新识别调用 recognizeStandardDoc", async () => {
   await screen.findByText("政策A");
   await userEvent.click(screen.getByRole("button", { name: "重新识别" }));
   await waitFor(() => expect(vi.mocked(api.recognizeStandardDoc)).toHaveBeenCalledWith(1));
+});
+
+test("有会话时点重新识别识别完成后自动发 send 命令", async () => {
+  // sample.recognition_status = "done"，点击后 useEffect 立即检测到 done → 调 send
+  renderLib();
+  await screen.findByText("政策A");
+  await userEvent.click(screen.getByRole("button", { name: "重新识别" }));
+  // 先等 recognizeStandardDoc 被调
+  await waitFor(() => expect(vi.mocked(api.recognizeStandardDoc)).toHaveBeenCalledWith(1));
+  // 等 send 被调，且参数含 doc_id=1 与 政策A
+  await waitFor(() => expect(mockSend).toHaveBeenCalled());
+  const msg = mockSend.mock.calls[0][0] as string;
+  expect(msg).toContain("doc_id=1");
+  expect(msg).toContain("政策A");
+});
+
+test("无会话时点重新识别只显示提示不调API", async () => {
+  _bladeState.activeSessionId = null;
+  const warnSpy = vi.spyOn(toast, "warning");
+  renderLib();
+  await screen.findByText("政策A");
+  await userEvent.click(screen.getByRole("button", { name: "重新识别" }));
+  // onRecognize 因无 activeSessionId 早返回，不应调用 recognizeStandardDoc 或 send
+  expect(vi.mocked(api.recognizeStandardDoc)).not.toHaveBeenCalled();
+  expect(mockSend).not.toHaveBeenCalled();
+  await waitFor(() => expect(warnSpy).toHaveBeenCalledWith("请先在右侧开始对话"));
+  warnSpy.mockRestore();
 });
 
 test("展开文档行显示抽取的条款与出处", async () => {
