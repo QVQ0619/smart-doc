@@ -58,6 +58,23 @@ def test_apply_evidence_segment_not_in_package_422(client, monkeypatch):
     assert r.status_code == 422
 
 
+def test_apply_evidence_no_locator_422(client, monkeypatch):
+    pkg_id, rv_id, seg_id = _bound_package(client, monkeypatch)
+    r = client.post(f"/api/packages/{pkg_id}/review",
+                    json={"checks": [{"rule_version_id": rv_id, "initial_result": "pass",
+                                      "evidence": [{"note": "无定位"}]}]})
+    assert r.status_code == 422
+
+
+def test_apply_empty_checks_accept(client, monkeypatch):
+    pkg_id, rv_id, seg_id = _bound_package(client, monkeypatch)
+    r = client.post(f"/api/packages/{pkg_id}/review", json={"checks": []})
+    assert r.status_code == 200
+    assert r.json()["conclusion"] == "accept"
+    got = client.get(f"/api/packages/{pkg_id}/review").json()
+    assert got["round"]["conclusion"] == "accept"
+
+
 def test_review_get_no_round(client, monkeypatch):
     monkeypatch.setattr(recognition, "parse_file", lambda path, ext: (
         [recognition.SegmentDraft(1, {"page": 1}, "paragraph", "x")], None))

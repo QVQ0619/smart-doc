@@ -205,6 +205,8 @@ def apply_review(db: Session, package_id: int, payload: "ReviewApplyIn") -> "Rev
         if c.initial_disposition is not None and c.initial_disposition not in _DISPOSITIONS:
             raise ValueError(f"initial_disposition 非法: {c.initial_disposition}")
         for e in c.evidence:
+            if e.segment_id is None and e.field_code is None and e.budget_item_id is None:
+                raise ValueError("evidence 须至少给 segment_id/field_code/budget_item_id 之一")
             if e.segment_id is not None and e.segment_id not in seg_ids:
                 raise ValueError(f"evidence segment_id {e.segment_id} 不属于本包")
             if e.budget_item_id is not None and e.budget_item_id not in budget_ids:
