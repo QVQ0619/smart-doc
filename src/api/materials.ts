@@ -53,3 +53,12 @@ export interface PackageStructured {
 export function getPackageStructured(packageId: number): Promise<PackageStructured> {
   return fetch(`/api/packages/${packageId}/structured`).then((r) => handle<PackageStructured>(r));
 }
+
+export interface MaterialFileSegments {
+  material_file_id: number;
+  file_name: string;
+  segments: MaterialSegment[];
+}
+export function getPackageSegments(packageId: number): Promise<MaterialFileSegments[]> {
+  return fetch(`/api/packages/${packageId}/segments`).then((r) => handle<MaterialFileSegments[]>(r));
+}
