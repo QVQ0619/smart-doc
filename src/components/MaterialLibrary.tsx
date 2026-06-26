@@ -1,7 +1,7 @@
 import { Table, Tag, Tabs } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useQuery } from "@tanstack/react-query";
-import { listMaterialPackages, listMaterialSegments, getPackageStructured,
+import { listMaterialPackages, listMaterialSegments, getPackageStructured, downloadMaterialFileUrl,
          type MaterialPackage, type MaterialFileBrief, type MaterialSegment } from "../api/materials";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -47,6 +47,10 @@ const FILE_COLS: ColumnsType<MaterialFileBrief> = [
     render: (_: unknown, f) => <Tag color={STATUS_COLOR[f.recognition_status] ?? "default"}>
       {STATUS_LABEL[f.recognition_status] ?? f.recognition_status}</Tag> },
   { title: "段落数", dataIndex: "segment_count", key: "segment_count", width: 90 },
+  { title: "原文件", key: "view", width: 110,
+    render: (_: unknown, f: MaterialFileBrief) => (
+      <a href={downloadMaterialFileUrl(f.material_file_id)} target="_blank" rel="noreferrer">查看原文件</a>
+    ) },
 ];
 
 function PackageFiles({ pkg }: { pkg: MaterialPackage }) {

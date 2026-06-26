@@ -348,7 +348,7 @@ export default function StandardDocLibrary() {
       render: (_: unknown, row: StandardDoc) => (
         <Space>
           <a href={downloadStandardDocUrl(row.id)} target="_blank" rel="noreferrer">
-            下载
+            查看原文件
           </a>
           <Button
             type="link"

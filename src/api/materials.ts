@@ -30,6 +30,9 @@ async function handle<T>(res: Response): Promise<T> {
 export function listMaterialPackages(): Promise<MaterialPackage[]> {
   return fetch("/api/material-packages").then((r) => handle<MaterialPackage[]>(r));
 }
+export function downloadMaterialFileUrl(id: number): string {
+  return `/api/material-files/${id}/download`;
+}
 export function listMaterialSegments(id: number): Promise<MaterialSegment[]> {
   return fetch(`/api/material-files/${id}/segments`).then((r) => handle<MaterialSegment[]>(r));
 }

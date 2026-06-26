@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { listMaterialPackages, listMaterialSegments, getPackageStructured } from "./materials";
+import { listMaterialPackages, listMaterialSegments, getPackageStructured, downloadMaterialFileUrl } from "./materials";
 
 describe("materials api", () => {
   beforeEach(() => { vi.restoreAllMocks(); });
@@ -20,5 +20,9 @@ describe("materials api", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(data), { status: 200 })));
     expect(await getPackageStructured(3)).toEqual(data);
     expect(fetch).toHaveBeenCalledWith("/api/packages/3/structured");
+  });
+
+  it("downloadMaterialFileUrl 返回正确下载路径", () => {
+    expect(downloadMaterialFileUrl(42)).toBe("/api/material-files/42/download");
   });
 });
