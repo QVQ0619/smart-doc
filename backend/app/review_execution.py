@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from datetime import datetime
 
 from sqlalchemy import delete, func, insert, null, select
 from sqlmodel import Session
 
 from .material_extraction import build_package_segments, build_package_structured
 from .materials import ensure_default_master_data
-from .models import (ApplicationPackage, BudgetItem, ConfigPackage, ConfigRuleVersion,
+from .models import (ApplicationPackage, BudgetItem, CheckReviewAction, ConfigPackage, ConfigRuleVersion,
                      FindingEvidence, MaterialFile, ParseSegment, RegulationClause,
                      ReviewBatch, ReviewDimension, ReviewRule, ReviewRuleClause,
                      ReviewRound, ReviewRuleVersion, RoundCheck, StandardDoc)
@@ -285,3 +286,50 @@ def get_review_results(db: Session, package_id: int) -> "ReviewResultOut":
                                   budget_item_id=e.budget_item_id, note=e.note) for e in ev]))
     return ReviewResultOut(round=RoundOut(round_id=rnd.id, round_no=rnd.round_no,
                                           conclusion=rnd.conclusion), checks=checks)
+
+
+def review_action(db: Session, round_check_id: int, action: str,
+                  final_result: str | None, final_disposition: str | None,
+                  remark: str | None, version: int) -> "CheckOut":
+    """人工复核:confirm(沿用初判)/overrule(改 final)。写 check_review_action+乐观锁+重聚合。
+    不存在→LookupError;version 不符→ConflictError;action/枚举非法→ValueError。"""
+    rc = db.get(RoundCheck, round_check_id)
+    if rc is None:
+        raise LookupError(f"round_check {round_check_id} not found")
+    if rc.version != version:
+        raise ConflictError(f"round_check {round_check_id} 版本过期(期望 {rc.version},收到 {version})")
+    from_result = rc.final_result if rc.final_result is not None else rc.initial_result
+    if action == "confirm":
+        rc.final_result = rc.initial_result
+        rc.final_disposition = rc.initial_disposition
+        rc.status = "confirmed"
+    elif action == "overrule":
+        if final_result not in _RESULTS:
+            raise ValueError(f"final_result 非法: {final_result}")
+        if final_disposition is not None and final_disposition not in _DISPOSITIONS:
+            raise ValueError(f"final_disposition 非法: {final_disposition}")
+        rc.final_result = final_result
+        rc.final_disposition = final_disposition
+        rc.status = "overruled"
+    else:
+        raise ValueError(f"action 非法: {action}")
+    actor_id = ensure_default_master_data(db).sys_user_id
+    db.add(CheckReviewAction(round_check_id=rc.id, actor_id=actor_id, action=action,
+                             from_result=from_result, to_result=rc.final_result, remark=remark))
+    rc.version += 1
+    rc.reviewed_by = actor_id
+    rc.reviewed_at = datetime.now()
+    rc.review_remark = remark
+    db.add(rc)
+    db.flush()
+    rnd = db.get(ReviewRound, rc.round_id)
+    rnd.conclusion = aggregate_conclusion(db, rc.round_id)
+    db.add(rnd)
+    db.commit()
+    # 复用 get_review_results 取该 check 的最新 CheckOut
+    pkg_id = db.execute(select(ReviewRound.package_id).where(ReviewRound.id == rc.round_id)).scalar_one()
+    result = get_review_results(db, pkg_id)
+    for co in result.checks:
+        if co.round_check_id == round_check_id:
+            return co
+    raise LookupError(f"round_check {round_check_id} 复核后未找到")  # 理论不达

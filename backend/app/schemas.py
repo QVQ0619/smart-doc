@@ -409,3 +409,11 @@ class RoundOut(BaseModel):
 class ReviewResultOut(BaseModel):
     round: Optional[RoundOut]
     checks: list[CheckOut]
+
+
+class ReviewActionIn(BaseModel):
+    action: str                      # confirm | overrule
+    final_result: Optional[str] = None
+    final_disposition: Optional[str] = None
+    remark: Optional[str] = None
+    version: int

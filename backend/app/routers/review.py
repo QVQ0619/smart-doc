@@ -3,9 +3,10 @@ from sqlmodel import Session
 
 from ..auth import require_api_key
 from ..db import get_session
-from ..review_execution import apply_review, bind_package_config, get_review_input, get_review_results
-from ..schemas import (BindConfigIn, BindConfigResult, ReviewApplyIn, ReviewApplyResult,
-                       ReviewInput, ReviewResultOut)
+from ..review_execution import (apply_review, bind_package_config, get_review_input,
+                                get_review_results, review_action, ConflictError)
+from ..schemas import (BindConfigIn, BindConfigResult, CheckOut, ReviewActionIn, ReviewApplyIn,
+                       ReviewApplyResult, ReviewInput, ReviewResultOut)
 
 router = APIRouter(tags=["review"])
 
@@ -51,3 +52,18 @@ def get_review(package_id: int, db: Session = Depends(get_session)) -> ReviewRes
         return get_review_results(db, package_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/round-checks/{round_check_id}/review-action", response_model=CheckOut,
+             dependencies=[Depends(require_api_key)])
+def post_review_action(round_check_id: int, body: ReviewActionIn,
+                       db: Session = Depends(get_session)) -> CheckOut:
+    try:
+        return review_action(db, round_check_id, body.action, body.final_result,
+                             body.final_disposition, body.remark, body.version)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
