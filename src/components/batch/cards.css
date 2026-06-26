@@ -1,0 +1,122 @@
+/* ===== batch/cards.css — 卡片网格与卡片样式（T5）===== */
+
+/* 供 T6/T7 页容器使用的网格布局 */
+.batch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* ===== 卡片主体内部结构 ===== */
+
+/* 覆盖 antd Card body 默认内边距 */
+.batch-card .ant-card-body {
+  padding: 0;
+}
+
+.batch-card__body {
+  padding: 16px 18px;
+}
+
+.batch-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.batch-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.4;
+  flex: 1;
+  min-width: 0;
+}
+
+.batch-card__title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-card__icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.batch-card__more {
+  color: #8c8c8c;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.batch-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+/* 统计行 */
+.batch-card__stat {
+  display: flex;
+  gap: 18px;
+  color: #595959;
+  font-size: 13px;
+  margin: 10px 0 4px;
+}
+
+.batch-card__stat b {
+  color: #1f1f1f;
+  font-size: 15px;
+  font-weight: 600;
+  margin-right: 3px;
+}
+
+/* 识别中时统计行置灰 */
+.batch-card__stat--dim {
+  opacity: 0.5;
+}
+
+/* 副信息行 */
+.batch-card__sub {
+  color: #8c8c8c;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* 底部操作区 */
+.batch-card__foot {
+  border-top: 1px solid #f0f0f0;
+  padding: 9px 18px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  background: #fcfcfc;
+}
+
+/* 状态色点 */
+.batch-card__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* hover 抬升（补充 antd hoverable 已有 shadow） */
+.ant-card.batch-card:hover {
+  transform: translateY(-2px);
+  border-color: #91caff;
+}
