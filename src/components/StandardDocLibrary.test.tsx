@@ -305,3 +305,65 @@ test("有 processing 行时轮询间隔收紧到 3 秒", async () => {
     vi.useRealTimers();
   }
 });
+
+test("文档初始为 failed 时重新识别不触发假失败，processing→done 后正常发 send", async () => {
+  const failedDoc     = { ...sample, recognition_status: "failed"     as const };
+  const processingDoc = { ...sample, recognition_status: "processing" as const };
+  const doneDoc       = { ...sample, recognition_status: "done"       as const };
+
+  // processingDeferred 控制点击后 invalidation refetch 的放行时机
+  let resolveProcessing!: (v: any) => void;
+  const processingDeferred = new Promise<any>((res) => { resolveProcessing = res; });
+  // doneDeferred 控制手动第二次 invalidation 后的放行时机
+  let resolveDone!: (v: any) => void;
+  const doneDeferred = new Promise<any>((res) => { resolveDone = res; });
+
+  vi.mocked(api.listStandardDocs)
+    .mockResolvedValueOnce([failedDoc]      as never)  // ① 初始渲染：failed
+    .mockReturnValueOnce(processingDeferred as never)  // ② 点击后 invalidation refetch（挂起）
+    .mockReturnValueOnce(doneDeferred       as never)  // ③ 手动第二次 invalidation（挂起）
+    .mockResolvedValue([doneDoc]            as never); // ④ 后续
+
+  const errorSpy = vi.spyOn(toast, "error");
+
+  // 暴露 QueryClient 以便测试内手动 invalidate，绕开 3s refetchInterval
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <StandardDocLibrary />
+    </QueryClientProvider>,
+  );
+
+  // 等初始渲染 → 识别失败
+  expect(await screen.findByText("识别失败")).toBeInTheDocument();
+
+  // 点击重新识别（文档当前为 failed）
+  await userEvent.click(screen.getByRole("button", { name: "重新识别" }));
+  await waitFor(() => expect(vi.mocked(api.recognizeStandardDoc)).toHaveBeenCalledWith(1));
+
+  // 陈旧 failed 被 sawProcessing 守卫忽略：无假错误、无 send
+  expect(errorSpy).not.toHaveBeenCalled();
+  expect(mockSend).not.toHaveBeenCalled();
+
+  // 放行 processing → effect 置 sawProcessing=true，send 不触发
+  resolveProcessing([processingDoc]);
+  await waitFor(() => expect(screen.getByText("识别中")).toBeInTheDocument());
+  expect(mockSend).not.toHaveBeenCalled();
+  expect(errorSpy).not.toHaveBeenCalled();
+
+  // 手动 invalidate 触发第 3 次 refetch → doneDeferred（不 await，避免阻塞于 doneDeferred）
+  qc.invalidateQueries({ queryKey: ["standard-docs"] });
+  // 等第 3 次 listStandardDocs 调用开始
+  await waitFor(() => expect(vi.mocked(api.listStandardDocs)).toHaveBeenCalledTimes(3));
+  // 放行 done → effect 发送命令
+  resolveDone([doneDoc]);
+
+  await waitFor(() => expect(mockSend).toHaveBeenCalled());
+  const msg = mockSend.mock.calls[0][0] as string;
+  expect(msg).toContain("doc_id=1");
+  expect(msg).toContain("政策A");
+  // 全程无假的 error 提示
+  expect(errorSpy).not.toHaveBeenCalled();
+
+  errorSpy.mockRestore();
+});

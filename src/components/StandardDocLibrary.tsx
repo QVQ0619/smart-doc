@@ -311,7 +311,8 @@ export default function StandardDocLibrary() {
       setPending((p) => (p ? { ...p, sawProcessing: true } : p));
       return;
     }
-    if (doc.recognition_status === "done" && pending.sawProcessing) {
+    if (!pending.sawProcessing) return;            // 未见本轮 processing 前，忽略陈旧 done/failed
+    if (doc.recognition_status === "done") {
       if (activeSessionId) {
         send(`请重新抽取规则文件《${pending.title}》(doc_id=${pending.docId}) 的审查规则。`);
         toast.info("已请 AI 重新抽取规则…");
