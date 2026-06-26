@@ -19,6 +19,13 @@ vi.mock("./pages/batch/BatchDetailPage", () => ({
   ),
 }));
 
+// 隔离 RuleDetailPage 的 QueryClient / Blade SDK 依赖，聚焦路由切换
+vi.mock("./pages/batch/RuleDetailPage", () => ({
+  default: ({ docId }: { docId: number }) => (
+    <div data-testid="rule-detail-page">规则详情 #{docId}</div>
+  ),
+}));
+
 beforeEach(() => {
   useRouteStore.setState({ nav: { name: "home" } });
 });
@@ -42,4 +49,14 @@ test("nav 为 batch-detail 渲染批次详情页含 id", async () => {
   const el = await screen.findByTestId("batch-detail-page");
   expect(el).toBeInTheDocument();
   expect(el.textContent).toContain("#3");
+});
+
+test("nav 为 rule-detail 渲染规则详情页含 docId", async () => {
+  useRouteStore.setState({
+    nav: { name: "rule-detail", docId: 5, docTitle: "政策A", batchId: 3, batchTitle: "甲" },
+  });
+  render(<App />);
+  const el = await screen.findByTestId("rule-detail-page");
+  expect(el).toBeInTheDocument();
+  expect(el.textContent).toContain("#5");
 });
