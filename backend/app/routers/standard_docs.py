@@ -255,7 +255,7 @@ def delete_standard_doc(doc_id: int, db: Session = Depends(get_session)):
             if _rp_cnt or _rs_cnt or _rparam_cnt:
                 raise HTTPException(
                     status_code=409,
-                    detail="该规则文件的规则已被审查执行或纳入配置包，无法彻底删除",
+                    detail="该规则文件的规则已绑定项目类型/阶段/参数配置，无法彻底删除",
                 )
 
     # 物理级联删除：严格按 FK RESTRICT 顺序（规则全链 → 条款 → 段落 → 批次关联 → 文档本身）
