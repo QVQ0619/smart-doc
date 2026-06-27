@@ -37,6 +37,19 @@ def list_batch_rule_docs(db: Session, batch_id: int) -> list[int]:
     return [r[0] for r in rows]
 
 
+def unbind_rule_doc(db: Session, batch_id: int, doc_id: int) -> bool:
+    """解除单个规则文件与批次的绑定（只删 batch_rule_doc 一行）。
+    删到返回 True；该关联不存在返回 False。不触碰 StandardDoc 及派生数据。"""
+    res = db.execute(
+        delete(BatchRuleDoc).where(
+            BatchRuleDoc.batch_id == batch_id,
+            BatchRuleDoc.standard_doc_id == doc_id,
+        )
+    )
+    db.commit()
+    return res.rowcount > 0
+
+
 def _batch_to_out(db: Session, batch: ReviewBatch) -> BatchOut:
     """把单个 ReviewBatch 行组装成 BatchOut（含三个聚合计数）。
     list_batches 与 get_batch_detail 共用此函数，保证计数口径一致。"""

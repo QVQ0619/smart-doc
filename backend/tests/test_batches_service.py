@@ -98,3 +98,28 @@ def test_unknown_doc_raises(client):
     with Session(engine) as db:
         with pytest.raises(LookupError):
             bind_rule_docs(db, b, [999999])
+
+
+def test_unbind_rule_doc_removes_one(client):
+    """解绑单个：bind [d1,d2] → unbind d1 → True，list 只剩 [d2]。"""
+    from app.batches import unbind_rule_doc
+    with Session(engine) as db:
+        b = _make_batch(db)
+        d1 = _make_doc(db, "DOC-U1")
+        d2 = _make_doc(db, "DOC-U2")
+        db.commit()
+        bind_rule_docs(db, b, [d1, d2])
+        assert unbind_rule_doc(db, b, d1) is True
+        assert list_batch_rule_docs(db, b) == [d2]
+
+
+def test_unbind_rule_doc_missing_returns_false(client):
+    """解绑不存在的关联 → False，list 不变。"""
+    from app.batches import unbind_rule_doc
+    with Session(engine) as db:
+        b = _make_batch(db)
+        d1 = _make_doc(db, "DOC-U3")
+        db.commit()
+        bind_rule_docs(db, b, [d1])
+        assert unbind_rule_doc(db, b, 999999) is False
+        assert list_batch_rule_docs(db, b) == [d1]

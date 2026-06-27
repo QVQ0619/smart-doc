@@ -403,3 +403,38 @@ def test_batch_packages_isolation(client, monkeypatch):
     # 全局列表仍含该包（委托不影响原行为）
     pkgs_global = client.get("/api/material-packages").json()
     assert any(p["package_id"] == pkg_id for p in pkgs_global), "全局列表应仍含该包"
+
+
+# --------------------------------------------------------------------------- #
+# DELETE /api/batches/{id}/standard-docs/{doc_id} 单个解绑
+# --------------------------------------------------------------------------- #
+
+def test_unbind_rule_doc_204(client):
+    """解绑单个规则文件 → 204，详情里该 doc 消失、另一个保留。"""
+    batch_id = _post_batch(client, "UNBIND-OK").json()["id"]
+    d1 = _upload_standard_doc(client, "规则解绑1.pdf")
+    d2 = _upload_standard_doc(client, "规则解绑2.pdf")
+    client.post(f"/api/batches/{batch_id}/bind-rule-docs",
+                json={"standard_doc_ids": [d1, d2]})
+
+    r = client.delete(f"/api/batches/{batch_id}/standard-docs/{d1}")
+    assert r.status_code == 204
+
+    detail = client.get(f"/api/batches/{batch_id}").json()
+    ids = [d["id"] for d in detail["rule_docs"]]
+    assert d1 not in ids and d2 in ids
+
+
+def test_unbind_rule_doc_missing_404(client):
+    """解绑不存在的关联 → 404。"""
+    batch_id = _post_batch(client, "UNBIND-MISS").json()["id"]
+    r = client.delete(f"/api/batches/{batch_id}/standard-docs/999999")
+    assert r.status_code == 404
+
+
+def test_unbind_rule_doc_requires_key(client, monkeypatch):
+    """配置 API key 后，解绑缺 key → 401。"""
+    monkeypatch.setattr(config.settings, "api_key", "secret")
+    batch_id = _post_batch(client, "UNBIND-AUTH", headers={"X-API-Key": "secret"}).json()["id"]
+    r = client.delete(f"/api/batches/{batch_id}/standard-docs/1")
+    assert r.status_code == 401
