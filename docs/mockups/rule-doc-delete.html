@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>规则文件 移除 / 彻底删除 · 效果原型</title>
+<style>
+  :root{
+    --primary:#1677ff; --primary-bg:#e6f0ff; --primary-bd:#91caff;
+    --green:#52c41a; --green-bg:#f6ffed; --green-bd:#b7eb8f;
+    --orange:#fa8c16; --orange-bg:#fff7e6; --orange-bd:#ffd591;
+    --red:#ff4d4f; --red-bg:#fff1f0; --red-bd:#ffccc7;
+    --gray:#8c8c8c; --gray-bg:#fafafa; --bd:#f0f0f0; --bd2:#e8e8e8;
+    --text:#1f1f1f; --text2:#595959; --text3:#8c8c8c;
+    --shadow:0 1px 4px rgba(0,0,0,.06); --shadow2:0 4px 16px rgba(0,0,0,.1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+    color:var(--text);background:#f0f2f5;font-size:14px;line-height:1.5;}
+  .shell{display:grid;grid-template-columns:220px 1fr;height:100vh}
+  .menu{background:#fff;border-right:1px solid var(--bd);display:flex;flex-direction:column}
+  .brand{padding:16px 20px;font-weight:700;font-size:15px;color:var(--primary);
+    border-bottom:1px solid var(--bd);}
+  .menu-group{padding:8px 0}
+  .menu-group__title{padding:6px 20px;color:var(--text3);font-size:12px}
+  .menu-item{display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;
+    color:var(--text2);font-size:14px;position:relative;}
+  .menu-item:hover{background:var(--gray-bg)}
+  .menu-item.active{background:var(--primary-bg);color:var(--primary);font-weight:600}
+  .menu-item.active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--primary)}
+  .menu-item .ic{width:16px;text-align:center;opacity:.85}
+  .menu-item .new{margin-left:auto;font-size:10px;background:var(--red);color:#fff;
+    border-radius:8px;padding:0 6px;line-height:15px;font-weight:600}
+
+  .main{overflow:auto;padding:22px 30px}
+  .breadcrumb{font-size:13px;color:var(--text3);margin-bottom:14px}
+  .breadcrumb a{color:var(--text3);cursor:pointer;text-decoration:none}
+  .breadcrumb .sep{margin:0 8px;color:#d9d9d9}
+  .breadcrumb .cur{color:var(--text)}
+  .page-title{font-size:20px;font-weight:600;margin-bottom:4px}
+  .page-sub{color:var(--text3);font-size:13px;margin-bottom:18px}
+
+  .btn{border:1px solid var(--bd2);background:#fff;border-radius:6px;padding:5px 14px;font-size:14px;
+    cursor:pointer;color:var(--text2);transition:.15s;white-space:nowrap;}
+  .btn:hover{color:var(--primary);border-color:var(--primary-bd)}
+  .btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn-primary:hover{background:#4096ff;border-color:#4096ff;color:#fff}
+  .btn-sm{padding:3px 11px;font-size:13px}
+  .btn-danger{color:var(--red);border-color:var(--red-bd)}
+  .btn-danger:hover{color:#fff;background:var(--red);border-color:var(--red)}
+  .btn-link{border:none;background:none;color:var(--primary);padding:3px 6px;cursor:pointer;font-size:13px}
+  .btn-link.danger{color:var(--red)}
+
+  .tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:1px 8px;border-radius:4px;
+    border:1px solid;line-height:18px;white-space:nowrap}
+  .tag-green{color:var(--green);background:var(--green-bg);border-color:var(--green-bd)}
+  .tag-blue{color:var(--primary);background:var(--primary-bg);border-color:var(--primary-bd)}
+  .tag-gray{color:var(--text2);background:var(--gray-bg);border-color:var(--bd2)}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+  .dot-green{background:var(--green)}
+
+  /* meta card */
+  .meta-card{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:18px 22px;
+    box-shadow:var(--shadow);margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+  .meta-fields{display:flex;gap:30px;flex-wrap:wrap}
+  .meta-fields .f{font-size:13px;color:var(--text3)}
+  .meta-fields .f b{display:block;color:var(--text);font-size:14px;font-weight:600;margin-top:2px}
+
+  /* tabs */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--bd);margin-bottom:18px}
+  .tab{padding:9px 18px;cursor:pointer;color:var(--text2);font-size:14px;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab.active{color:var(--primary);font-weight:600;border-bottom-color:var(--primary)}
+  .tab .cnt{color:var(--text3);font-weight:400;margin-left:4px}
+
+  /* rule doc cards grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .card{background:#fff;border:1px solid var(--bd);border-radius:10px;overflow:hidden;
+    box-shadow:var(--shadow);display:flex;flex-direction:column;}
+  .card__body{padding:16px 18px;flex:1}
+  .card__title{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;line-height:1.4}
+  .card__title .ficon{font-size:18px}
+  .card__meta{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+  .card__stat{display:flex;gap:20px;color:var(--text2);font-size:13px;margin:10px 0 4px}
+  .card__stat b{color:var(--text);font-size:15px;font-weight:600;margin-right:3px}
+  .card__sub{color:var(--text3);font-size:12px;margin-top:8px}
+  .card__foot{border-top:1px solid var(--bd);padding:9px 14px;display:flex;gap:6px;align-items:center;
+    justify-content:flex-end;background:#fcfcfc;}
+
+  /* rule library table */
+  .ltable{background:#fff;border:1px solid var(--bd);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+  .lrow{display:grid;grid-template-columns:2fr .9fr .8fr .8fr 1.3fr;gap:10px;padding:13px 20px;
+    align-items:center;border-bottom:1px solid var(--bd)}
+  .lrow:last-child{border-bottom:none}
+  .lrow.head{background:var(--gray-bg);color:var(--text3);font-size:12.5px;font-weight:500}
+  .lrow .fn{font-weight:500;display:flex;align-items:center;gap:8px}
+  .lrow .ops{display:flex;gap:4px;justify-content:flex-end}
+
+  /* highlight ring for NEW elements */
+  .spot{position:relative}
+  .spot::after{content:"新增";position:absolute;top:-9px;right:-6px;background:var(--red);color:#fff;
+    font-size:10px;padding:0 6px;border-radius:8px;line-height:16px;font-weight:600;box-shadow:var(--shadow)}
+  .ring{box-shadow:0 0 0 2px var(--red-bd),var(--shadow) !important;border-radius:6px}
+
+  /* ===== beautified rule detail (复用批次详情页样式) ===== */
+  .page-head2{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .page-head2 .t{font-size:20px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .chip{padding:4px 14px;border:1px solid var(--bd2);border-radius:16px;cursor:pointer;font-size:13px;
+    color:var(--text2);background:#fff;transition:.15s}
+  .chip:hover{border-color:var(--primary-bd);color:var(--primary)}
+  .chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
+  .chip .c{opacity:.7;margin-left:3px}
+  .dim-group{margin-bottom:22px}
+  .dim-group__h{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .dim-group__h .bar{width:3px;height:14px;border-radius:2px;background:var(--primary)}
+  .rule{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:14px 18px;margin-bottom:10px;
+    box-shadow:var(--shadow);transition:.15s;}
+  .rule:hover{border-color:var(--primary-bd);box-shadow:var(--shadow2)}
+  .rule__top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .rule__name{font-size:15px;font-weight:600}
+  .rule__badges{display:flex;gap:6px;flex-shrink:0}
+  .rule__logic{color:var(--text2);font-size:13.5px;margin-top:8px;line-height:1.6}
+  .rule__logic .lb{color:var(--text3)}
+  .rule__prov{color:var(--text3);font-size:12.5px;margin-top:10px;display:flex;align-items:center;gap:5px}
+  .clausecard{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:14px 18px;margin-bottom:10px;
+    box-shadow:var(--shadow)}
+  .clausecard .cno{font-weight:600;color:var(--primary)}
+  .clausecard .ctext{color:var(--text2);font-size:13.5px;margin-top:6px;line-height:1.7}
+  .clausecard .cprov{color:var(--text3);font-size:12.5px;margin-top:8px}
+
+  /* popconfirm / modal */
+  .mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;
+    justify-content:center;z-index:50;padding-top:120px}
+  .mask.show{display:flex}
+  .pop{background:#fff;border-radius:10px;width:440px;box-shadow:0 8px 40px rgba(0,0,0,.2);overflow:hidden}
+  .pop__h{padding:16px 22px 8px;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .pop__h .warn{color:var(--red);font-size:18px}
+  .pop__b{padding:0 22px 8px 52px;color:var(--text2);font-size:13.5px;line-height:1.7}
+  .pop__list{margin:6px 0 0;padding-left:18px;color:var(--text2)}
+  .pop__alert{margin:12px 22px;padding:10px 14px;background:var(--red-bg);border:1px solid var(--red-bd);
+    border-radius:8px;color:#cf1322;font-size:12.5px;display:flex;gap:8px}
+  .pop__f{padding:12px 22px;display:flex;justify-content:flex-end;gap:10px}
+
+  .hint{background:#f0f7ff;border:1px solid var(--primary-bd);border-radius:8px;padding:10px 14px;
+    font-size:13px;color:var(--text2);margin-bottom:18px;display:flex;gap:8px}
+  .pane{display:none}
+  .pane.active{display:block}
+
+  /* legend banner */
+  .legend{background:#fffbe6;border:1px solid var(--orange-bd);border-radius:8px;padding:10px 16px;
+    margin-bottom:18px;font-size:13px;color:var(--text2);display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+  .legend b{color:var(--orange)}
+  .legend .sw{display:inline-flex;align-items:center;gap:6px}
+  .legend .chip{background:var(--red);color:#fff;font-size:10px;border-radius:8px;padding:0 6px;line-height:16px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- ===== 左侧菜单 ===== -->
+  <aside class="menu">
+    <div class="brand">立项审查AI辅助系统</div>
+    <div class="menu-group">
+      <div class="menu-group__title">概览</div>
+      <div class="menu-item"><span class="ic">🏠</span>工作台</div>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group__title">审查</div>
+      <div class="menu-item"><span class="ic">📝</span>新建审查</div>
+      <div class="menu-item"><span class="ic">📋</span>审查任务</div>
+      <div class="menu-item"><span class="ic">📊</span>审查报告</div>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group__title">资源</div>
+      <div class="menu-item active" onclick="showPane('batch')"><span class="ic">📦</span>项目批次</div>
+      <!-- 改动③：新增菜单项 -->
+      <div class="menu-item" onclick="showPane('lib')"><span class="ic">📚</span>规则库<span class="new">新</span></div>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group__title">系统</div>
+      <div class="menu-item"><span class="ic">ℹ️</span>关于流程</div>
+    </div>
+  </aside>
+
+  <!-- ===== 主区 ===== -->
+  <main class="main">
+    <div class="legend">
+      <span><b>效果原型（仅演示，未改代码）</b></span>
+      <span class="sw"><span class="chip">新增</span> 标记本次改动</span>
+      <span>· 左侧菜单切换「项目批次 / 规则库」· 规则库行点「查看规则」进美化详情页（与批次一致）</span>
+    </div>
+
+    <!-- ============ 批次详情页 ============ -->
+    <section id="pane-batch" class="pane active">
+      <div class="breadcrumb"><a>项目批次</a><span class="sep">/</span><span class="cur">2026年度第一批 · 自然科学基金</span></div>
+
+      <div class="meta-card">
+        <div class="meta-fields">
+          <div class="f">批次号<b>NSFC-2026-01</b></div>
+          <div class="f">项目类型<b>面上项目</b></div>
+          <div class="f">审查阶段<b>形式审查</b></div>
+          <div class="f">申报期<b>2026-01 ~ 2026-03</b></div>
+          <div class="f">批次状态<b><span class="tag tag-green"><span class="dot dot-green"></span>进行中</span></b></div>
+        </div>
+        <button class="btn btn-primary">绑定规则集</button>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active">规则库<span class="cnt">3</span></div>
+        <div class="tab">配置包</div>
+        <div class="tab">审查文档库<span class="cnt">8</span></div>
+      </div>
+
+      <div class="hint">
+        <span>💡</span>
+        <span>「从批次移除」只解除该规则文件与<b>本批次</b>的绑定，规则文件本身仍保留在规则库、其他批次不受影响。要永久删除请去「规则库」。</span>
+      </div>
+
+      <div class="grid">
+        <!-- 卡片1：带新增的移除按钮 -->
+        <div class="card">
+          <div class="card__body">
+            <div class="card__title"><span class="ficon">📄</span>国家自然科学基金条例.pdf</div>
+            <div class="card__meta">
+              <span class="tag tag-green"><span class="dot dot-green"></span>已识别</span>
+              <span class="tag tag-gray">PDF · 1.2 MB</span>
+            </div>
+            <div class="card__stat"><span><b>42</b>段落</span><span><b>18</b>条款</span><span><b>18</b>规则</span></div>
+            <div class="card__sub">上传于 2026-06-20 14:32</div>
+          </div>
+          <div class="card__foot">
+            <button class="btn btn-sm">查看规则</button>
+            <button class="btn btn-sm">原文</button>
+            <!-- 改动①：新增「从批次移除」 -->
+            <span class="spot"><button class="btn btn-sm btn-danger" onclick="openPop('unbind')">从批次移除</button></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__body">
+            <div class="card__title"><span class="ficon">📄</span>申报书撰写要求.docx</div>
+            <div class="card__meta">
+              <span class="tag tag-green"><span class="dot dot-green"></span>已识别</span>
+              <span class="tag tag-gray">DOCX · 256 KB</span>
+            </div>
+            <div class="card__stat"><span><b>27</b>段落</span><span><b>9</b>条款</span><span><b>9</b>规则</span></div>
+            <div class="card__sub">上传于 2026-06-21 09:10</div>
+          </div>
+          <div class="card__foot">
+            <button class="btn btn-sm">查看规则</button>
+            <button class="btn btn-sm">原文</button>
+            <button class="btn btn-sm btn-danger" onclick="openPop('unbind')">从批次移除</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__body">
+            <div class="card__title"><span class="ficon">📄</span>预算编制说明.pdf</div>
+            <div class="card__meta">
+              <span class="tag tag-green"><span class="dot dot-green"></span>已识别</span>
+              <span class="tag tag-gray">PDF · 480 KB</span>
+            </div>
+            <div class="card__stat"><span><b>15</b>段落</span><span><b>6</b>条款</span><span><b>6</b>规则</span></div>
+            <div class="card__sub">上传于 2026-06-22 16:48</div>
+          </div>
+          <div class="card__foot">
+            <button class="btn btn-sm">查看规则</button>
+            <button class="btn btn-sm">原文</button>
+            <button class="btn btn-sm btn-danger" onclick="openPop('unbind')">从批次移除</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 规则库页（新可达） ============ -->
+    <section id="pane-lib" class="pane">
+      <div class="page-title spot" style="display:inline-block">规则库</div>
+      <div class="page-sub">跨批次管理所有规则文件。<b style="color:var(--red)">彻底删除</b>会物理级联清除该文件的全部派生数据并从所有批次解绑，不可恢复。</div>
+
+      <div class="ltable">
+        <div class="lrow head">
+          <div>规则文件</div><div>识别状态</div><div>条款</div><div>规则</div><div style="text-align:right">操作</div>
+        </div>
+        <div class="lrow">
+          <div class="fn">📄 国家自然科学基金条例.pdf</div>
+          <div><span class="tag tag-green">已识别</span></div>
+          <div>18</div><div>18</div>
+          <div class="ops">
+            <button class="btn-link" onclick="showPane('detail')">查看规则</button>
+            <button class="btn-link">重新识别</button>
+            <!-- 改动②：彻底删除（已有按钮，文案改强警示 + 后端补级联） -->
+            <span class="spot"><button class="btn-link danger" onclick="openPop('purge')">彻底删除</button></span>
+          </div>
+        </div>
+        <div class="lrow">
+          <div class="fn">📄 申报书撰写要求.docx</div>
+          <div><span class="tag tag-green">已识别</span></div>
+          <div>9</div><div>9</div>
+          <div class="ops">
+            <button class="btn-link" onclick="showPane('detail')">查看规则</button>
+            <button class="btn-link">重新识别</button>
+            <button class="btn-link danger" onclick="openPop('purge')">彻底删除</button>
+          </div>
+        </div>
+        <div class="lrow">
+          <div class="fn">📄 预算编制说明.pdf</div>
+          <div><span class="tag tag-green">已识别</span></div>
+          <div>6</div><div>6</div>
+          <div class="ops">
+            <button class="btn-link" onclick="showPane('detail')">查看规则</button>
+            <button class="btn-link">重新识别</button>
+            <button class="btn-link danger" onclick="openPop('purge')">彻底删除</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 规则详情页（复用批次的美化页，从规则库进入） ============ -->
+    <section id="pane-detail" class="pane">
+      <!-- 改动④：从规则库进来时，面包屑是「规则库 / 文件名」，无批次上下文 -->
+      <div class="breadcrumb spot" style="display:inline-block">
+        <a onclick="showPane('lib')">规则库</a><span class="sep">/</span><span class="cur">国家自然科学基金条例.pdf</span>
+      </div>
+      <div class="page-head2">
+        <div class="t">📘 国家自然科学基金条例.pdf</div>
+        <div style="display:flex;gap:10px">
+          <button class="btn">查看原文件</button>
+          <button class="btn">重新识别并重抽规则</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active">审查规则</div>
+        <div class="tab">依据条款</div>
+      </div>
+
+      <div class="chips">
+        <div class="chip active">全部<span class="c">18</span></div>
+        <div class="chip">完整性<span class="c">5</span></div>
+        <div class="chip">合规性<span class="c">6</span></div>
+        <div class="chip">规范性<span class="c">3</span></div>
+        <div class="chip">真实性<span class="c">4</span></div>
+      </div>
+
+      <div class="dim-group">
+        <div class="dim-group__h"><span class="bar"></span>完整性</div>
+        <div class="rule">
+          <div class="rule__top">
+            <div class="rule__name">申报书必填字段完整</div>
+            <div class="rule__badges">
+              <span class="tag tag-red">硬性</span><span class="tag tag-gray">驳回</span>
+            </div>
+          </div>
+          <div class="rule__logic"><span class="lb">判定逻辑：</span>申报书的项目名称、负责人、依托单位、研究期限等字段不得为空。</div>
+          <div class="rule__prov">📎 依据：第八条 · 第3页第2段</div>
+        </div>
+        <div class="rule">
+          <div class="rule__top">
+            <div class="rule__name">附件清单齐全</div>
+            <div class="rule__badges">
+              <span class="tag tag-orange">需核验</span><span class="tag tag-gray">补正</span>
+            </div>
+          </div>
+          <div class="rule__logic"><span class="lb">判定逻辑：</span>身份证明、职称证明、合作协议等附件应齐全。</div>
+          <div class="rule__prov">📎 依据：第十二条 · 第5页第1段</div>
+        </div>
+      </div>
+
+      <div class="dim-group">
+        <div class="dim-group__h"><span class="bar" style="background:var(--green)"></span>合规性</div>
+        <div class="rule">
+          <div class="rule__top">
+            <div class="rule__name">负责人申请项目数不超限</div>
+            <div class="rule__badges">
+              <span class="tag tag-red">硬性</span><span class="tag tag-gray">驳回</span>
+            </div>
+          </div>
+          <div class="rule__logic"><span class="lb">判定逻辑：</span>同一负责人当年作为申请人申请的项目数不超过 2 项。</div>
+          <div class="rule__prov">📎 依据：第十五条 · 第6页第3段</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== 二次确认弹窗 ===== -->
+<div class="mask" id="mask">
+  <div class="pop">
+    <!-- 移除确认 -->
+    <div id="pop-unbind">
+      <div class="pop__h"><span class="warn">⚠️</span><span>从本批次移除该规则文件？</span></div>
+      <div class="pop__b">
+        将解除「国家自然科学基金条例.pdf」与<b>本批次</b>的绑定关系。
+        <ul class="pop__list">
+          <li>规则文件本身<b>仍保留</b>在规则库</li>
+          <li>已派生的条款 / 审查规则 / 配置包<b>不受影响</b></li>
+          <li>绑定到此文件的其他批次<b>不受影响</b></li>
+        </ul>
+      </div>
+      <div class="pop__f">
+        <button class="btn" onclick="closePop()">取消</button>
+        <button class="btn btn-primary" onclick="closePop()">确认移除</button>
+      </div>
+    </div>
+    <!-- 彻底删除确认 -->
+    <div id="pop-purge" style="display:none">
+      <div class="pop__h"><span class="warn">🗑️</span><span>彻底删除该规则文件？</span></div>
+      <div class="pop__b">
+        将<b style="color:var(--red)">永久删除</b>「国家自然科学基金条例.pdf」及其全部派生数据：
+        <ul class="pop__list">
+          <li>18 条 法规条款（regulation_clause）</li>
+          <li>18 条 审查规则及版本（review_rule / version）</li>
+          <li>派生的配置包（config_package）</li>
+          <li>从<b>所有批次</b>自动解绑</li>
+        </ul>
+      </div>
+      <div class="pop__alert"><span>🚫</span><span>此操作物理删除、<b>不可恢复</b>。请确认无批次正在依赖该规则文件。</span></div>
+      <div class="pop__f">
+        <button class="btn" onclick="closePop()">取消</button>
+        <button class="btn btn-danger" onclick="closePop()">确认彻底删除</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showPane(name){
+    document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+    document.getElementById('pane-'+name).classList.add('active');
+    // 菜单高亮：批次页→项目批次；规则库/规则详情→规则库
+    const menus = document.querySelectorAll('.menu-item');
+    menus.forEach(m=>m.classList.remove('active'));
+    const idx = (name === 'batch') ? 4 : 5;  // 4=项目批次, 5=规则库
+    if (menus[idx]) menus[idx].classList.add('active');
+    document.querySelector('.main').scrollTop = 0;
+  }
+  function openPop(kind){
+    document.getElementById('pop-unbind').style.display = kind==='unbind' ? 'block':'none';
+    document.getElementById('pop-purge').style.display  = kind==='purge'  ? 'block':'none';
+    document.getElementById('mask').classList.add('show');
+  }
+  function closePop(){ document.getElementById('mask').classList.remove('show'); }
+  document.getElementById('mask').addEventListener('click', e=>{ if(e.target.id==='mask') closePop(); });
+</script>
+</body>
+</html>
