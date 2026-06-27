@@ -4,13 +4,15 @@ from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlmodel import Session
 
 from ..auth import require_api_key
 from ..config import get_max_upload_bytes
 from ..db import engine, get_session
-from ..models import BatchRuleDoc, FileObject, ParseSegment, RegulationClause, StandardDoc
+from ..models import (BatchRuleDoc, ConfigRuleVersion, FileObject, ParseSegment,
+                      RegulationClause, ReviewRuleClause, ReviewRuleVersion,
+                      RoundCheck, RuleParam, RuleProject, RuleStage, StandardDoc)
 from ..recognition import recognize_standard_doc
 from ..structuring import delete_rules_for_doc
 from ..schemas import ConflictItem, FailedItem, RecognizeResult, StandardDocOut, UploadResult
@@ -212,6 +214,50 @@ def delete_standard_doc(doc_id: int, db: Session = Depends(get_session)):
     sd = db.get(StandardDoc, doc_id)
     if sd is None or not sd.is_active:
         raise HTTPException(status_code=404, detail="standard_doc not found")
+
+    # ── 预检下游引用：命中则拦截，保留审查执行/审计数据 ──
+    _version_ids = list(db.execute(
+        select(ReviewRuleClause.rule_version_id)
+        .join(RegulationClause, ReviewRuleClause.clause_id == RegulationClause.id)
+        .where(RegulationClause.standard_doc_id == doc_id)
+    ).scalars().all())
+    if _version_ids:
+        _rc_cnt = db.execute(
+            select(func.count()).select_from(RoundCheck)
+            .where(RoundCheck.rule_version_id.in_(_version_ids))
+        ).scalar_one()
+        _crv_cnt = db.execute(
+            select(func.count()).select_from(ConfigRuleVersion)
+            .where(ConfigRuleVersion.rule_version_id.in_(_version_ids))
+        ).scalar_one()
+        if _rc_cnt or _crv_cnt:
+            raise HTTPException(
+                status_code=409,
+                detail="该规则文件的规则已被审查执行或纳入配置包，无法彻底删除",
+            )
+        _rule_ids = list(db.execute(
+            select(ReviewRuleVersion.rule_id)
+            .where(ReviewRuleVersion.id.in_(_version_ids))
+        ).scalars().all())
+        if _rule_ids:
+            _rp_cnt = db.execute(
+                select(func.count()).select_from(RuleProject)
+                .where(RuleProject.rule_id.in_(_rule_ids))
+            ).scalar_one()
+            _rs_cnt = db.execute(
+                select(func.count()).select_from(RuleStage)
+                .where(RuleStage.rule_id.in_(_rule_ids))
+            ).scalar_one()
+            _rparam_cnt = db.execute(
+                select(func.count()).select_from(RuleParam)
+                .where(RuleParam.rule_id.in_(_rule_ids))
+            ).scalar_one()
+            if _rp_cnt or _rs_cnt or _rparam_cnt:
+                raise HTTPException(
+                    status_code=409,
+                    detail="该规则文件的规则已被审查执行或纳入配置包，无法彻底删除",
+                )
+
     # 物理级联删除：严格按 FK RESTRICT 顺序（规则全链 → 条款 → 段落 → 批次关联 → 文档本身）
     delete_rules_for_doc(db, doc_id)
     db.execute(delete(RegulationClause).where(RegulationClause.standard_doc_id == doc_id))

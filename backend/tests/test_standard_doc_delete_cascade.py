@@ -1,13 +1,14 @@
 """彻底删除规则文件：物理级联清除 batch_rule_doc / 规则全链 / 条款 / 段落，并物理删除 standard_doc。"""
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlmodel import Session
 
 from app.db import engine
-from app.models import (BatchRuleDoc, FileObject, ParseSegment,
+from app.models import (BatchRuleDoc, ConfigPackage, ConfigRuleVersion,
+                        FileObject, ParseSegment, ProjectType,
                         RegulationClause, ReviewRule, ReviewRuleClause,
-                        ReviewRuleVersion, StandardDoc)
+                        ReviewRuleVersion, ReviewStage, StandardDoc)
 
 
 def _upload(client, filename="规则X.pdf") -> int:
@@ -69,6 +70,80 @@ def test_delete_standard_doc_cascades_everything(client):
         # 补：file_object 行仍存在但 deleted_at 应已被置（软删）
         fo = s.get(FileObject, file_id)
         assert fo is not None and fo.deleted_at is not None
+
+
+def test_delete_standard_doc_blocked_by_config_rule_version(client):
+    """规则被纳入配置包时，彻底删除应返回 409，且文档/规则保持不变（假绿堵漏用例）。"""
+    doc_id = _upload(client)
+
+    # 建 clause + 规则
+    with Session(engine) as s:
+        doc_code = s.execute(
+            select(StandardDoc.doc_code).where(StandardDoc.id == doc_id)
+        ).scalar_one()
+        s.add(RegulationClause(standard_doc_id=doc_id, doc_code=doc_code, clause_no="第一条"))
+        s.commit()
+        clause_id = s.execute(
+            select(RegulationClause.id).where(RegulationClause.standard_doc_id == doc_id)
+        ).scalar_one()
+
+    r = client.post(f"/api/standard-docs/{doc_id}/rules", json={"rules": [
+        {"source_clause_id": clause_id, "dimension_code": "compliance", "name": "被引用规则",
+         "logic": None, "decision_type": "hard", "disposition": "reject",
+         "binding_class": "common"}]})
+    assert r.status_code == 200, r.text
+
+    # 取 rule_version_id
+    with Session(engine) as s:
+        version_id = s.execute(
+            select(ReviewRuleClause.rule_version_id)
+            .join(RegulationClause, ReviewRuleClause.clause_id == RegulationClause.id)
+            .where(RegulationClause.standard_doc_id == doc_id)
+        ).scalar_one()
+
+    # 构造前置主数据（INSERT IGNORE 避同会话重复，code 均有 UNIQUE 约束）
+    with Session(engine) as s:
+        s.execute(text(
+            "INSERT IGNORE INTO project_type (code, name, sector, level) "
+            "VALUES ('PT-BLOCK', 'BlockTest', '教育', 1)"
+        ))
+        s.execute(text(
+            "INSERT IGNORE INTO review_stage (code, name) "
+            "VALUES ('proposal', '立项建议')"
+        ))
+        s.commit()
+        pt_id = s.execute(text("SELECT id FROM project_type WHERE code='PT-BLOCK'")).scalar_one()
+        rs_id = s.execute(text("SELECT id FROM review_stage WHERE code='proposal'")).scalar_one()
+
+        # ConfigPackage：用 raw SQL 插入，避免 SQLModel 把 None→JSON'null' 触发 chk_cp_flow
+        uid = uuid.uuid4().hex[:8]
+        s.execute(text(
+            "INSERT INTO config_package (code, project_type_id, stage_id, name, version, status) "
+            "VALUES (:code, :pt_id, :rs_id, 'TestConfigPkg', 'V1.0', 'draft')"
+        ), {"code": f"CP-{uid}", "pt_id": pt_id, "rs_id": rs_id})
+        s.commit()
+        cp_id = s.execute(
+            text(f"SELECT id FROM config_package WHERE code='CP-{uid}'")
+        ).scalar_one()
+
+        # ConfigRuleVersion 引用 version_id → 触发预检拦截
+        crv = ConfigRuleVersion(config_id=cp_id, rule_version_id=version_id)
+        s.add(crv)
+        s.commit()
+
+    # 删除必须被拦截 → 409
+    resp = client.delete(f"/api/standard-docs/{doc_id}")
+    assert resp.status_code == 409, f"期望 409，实际 {resp.status_code}: {resp.text}"
+    detail = resp.json().get("detail", "")
+    assert "无法彻底删除" in detail, f"detail 未含预期中文提示: {detail}"
+
+    # 文档与规则/版本仍保持不变
+    with Session(engine) as s:
+        assert s.get(StandardDoc, doc_id) is not None, "StandardDoc 被错误删除"
+        assert s.execute(
+            select(func.count()).select_from(ReviewRuleVersion)
+            .where(ReviewRuleVersion.id == version_id)
+        ).scalar_one() == 1, "ReviewRuleVersion 被错误删除"
 
 
 def test_delete_standard_doc_unknown_404(client):
