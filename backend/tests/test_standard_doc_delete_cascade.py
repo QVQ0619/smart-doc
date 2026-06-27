@@ -5,8 +5,9 @@ from sqlalchemy import func, select
 from sqlmodel import Session
 
 from app.db import engine
-from app.models import (BatchRuleDoc, ParseSegment, RegulationClause,
-                        ReviewRuleClause, StandardDoc)
+from app.models import (BatchRuleDoc, FileObject, ParseSegment,
+                        RegulationClause, ReviewRule, ReviewRuleClause,
+                        ReviewRuleVersion, StandardDoc)
 
 
 def _upload(client, filename="规则X.pdf") -> int:
@@ -44,6 +45,12 @@ def test_delete_standard_doc_cascades_everything(client):
     client.post(f"/api/batches/{batch_id}/bind-rule-docs",
                 json={"standard_doc_ids": [doc_id]})
 
+    # 删除前记录 file_id，用于后续 file_object 软删验证
+    with Session(engine) as s:
+        file_id = s.execute(
+            select(StandardDoc.file_id).where(StandardDoc.id == doc_id)
+        ).scalar_one()
+
     # 彻底删除
     assert client.delete(f"/api/standard-docs/{doc_id}").status_code == 204
 
@@ -56,6 +63,12 @@ def test_delete_standard_doc_cascades_everything(client):
         assert s.execute(select(func.count()).select_from(ParseSegment)
                          .where(ParseSegment.standard_doc_id == doc_id)).scalar_one() == 0
         assert s.execute(select(func.count()).select_from(ReviewRuleClause)).scalar_one() == 0
+        # 补：ReviewRule / ReviewRuleVersion 主体表必须同时归零
+        assert s.execute(select(func.count()).select_from(ReviewRule)).scalar_one() == 0
+        assert s.execute(select(func.count()).select_from(ReviewRuleVersion)).scalar_one() == 0
+        # 补：file_object 行仍存在但 deleted_at 应已被置（软删）
+        fo = s.get(FileObject, file_id)
+        assert fo is not None and fo.deleted_at is not None
 
 
 def test_delete_standard_doc_unknown_404(client):
