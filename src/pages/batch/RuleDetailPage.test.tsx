@@ -253,3 +253,15 @@ test("有会话时点「重新识别并重抽规则」调用 recognizeStandardDo
   await userEvent.click(screen.getByRole("button", { name: "重新识别并重抽规则" }));
   await waitFor(() => expect(vi.mocked(api.recognizeStandardDoc)).toHaveBeenCalledWith(10));
 });
+
+test("无批次上下文：面包屑显示『规则库』并导航到 rule-library", async () => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <RuleDetailPage docId={7} docTitle="政策B" />
+    </QueryClientProvider>,
+  );
+  const lib = await screen.findByText("规则库");
+  await userEvent.click(lib);
+  expect(useRouteStore.getState().nav.name).toBe("rule-library");
+});

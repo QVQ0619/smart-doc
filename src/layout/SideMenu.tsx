@@ -22,9 +22,13 @@ export default function SideMenu() {
   const toggle = useMenuCollapseStore((s) => s.toggle);
 
   const selectedKey =
-    nav.name === "batch-detail" || nav.name === "rule-detail"
+    nav.name === "batch-detail"
       ? "batch-list"
-      : nav.name;
+      : nav.name === "rule-detail"
+        ? nav.batchId != null
+          ? "batch-list"
+          : "rule-library"
+        : nav.name;
 
   if (collapsed) {
     return (

@@ -4,7 +4,7 @@ import type { RouteKey } from "../layout/menuConfig";
 export type Nav =
   | { name: RouteKey }
   | { name: "batch-detail"; batchId: number; batchTitle: string }
-  | { name: "rule-detail"; docId: number; docTitle: string; batchId: number; batchTitle: string };
+  | { name: "rule-detail"; docId: number; docTitle: string; batchId?: number; batchTitle?: string };
 
 interface RouteState {
   nav: Nav;

@@ -19,8 +19,8 @@ import ClauseItemCard from "../../components/batch/ClauseItemCard";
 interface Props {
   docId: number;
   docTitle: string;
-  batchId: number;
-  batchTitle: string;
+  batchId?: number;
+  batchTitle?: string;
 }
 
 export default function RuleDetailPage({ docId, docTitle, batchId, batchTitle }: Props) {
@@ -103,18 +103,24 @@ export default function RuleDetailPage({ docId, docTitle, batchId, batchTitle }:
     queryFn: () => listClauses(docId),
   });
 
+  const hasBatch = batchId != null && batchTitle != null;
   function goToBatchDetail() {
-    navigate({ name: "batch-detail", batchId, batchTitle });
+    if (hasBatch) navigate({ name: "batch-detail", batchId, batchTitle });
   }
 
   const previewUrl = downloadStandardDocUrl(docId);
 
-  const breadcrumbItems: BreadcrumbProps["items"] = [
-    { title: <a onClick={() => navigate({ name: "batch-list" })}>项目批次</a> },
-    { title: <a onClick={goToBatchDetail}>{batchTitle}</a> },
-    { title: <a onClick={goToBatchDetail}>规则库</a> },
-    { title: docTitle },
-  ];
+  const breadcrumbItems: BreadcrumbProps["items"] = hasBatch
+    ? [
+        { title: <a onClick={() => navigate({ name: "batch-list" })}>项目批次</a> },
+        { title: <a onClick={goToBatchDetail}>{batchTitle}</a> },
+        { title: <a onClick={goToBatchDetail}>规则库</a> },
+        { title: docTitle },
+      ]
+    : [
+        { title: <a onClick={() => navigate({ name: "rule-library" })}>规则库</a> },
+        { title: docTitle },
+      ];
 
   return (
     <>
