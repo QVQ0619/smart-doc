@@ -4,14 +4,15 @@ from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlmodel import Session
 
 from ..auth import require_api_key
 from ..config import get_max_upload_bytes
 from ..db import engine, get_session
-from ..models import FileObject, StandardDoc
+from ..models import BatchRuleDoc, FileObject, ParseSegment, RegulationClause, StandardDoc
 from ..recognition import recognize_standard_doc
+from ..structuring import delete_rules_for_doc
 from ..schemas import ConflictItem, FailedItem, RecognizeResult, StandardDocOut, UploadResult
 from ..storage import FileStorage, FileTooLargeError, get_storage
 
@@ -211,11 +212,15 @@ def delete_standard_doc(doc_id: int, db: Session = Depends(get_session)):
     sd = db.get(StandardDoc, doc_id)
     if sd is None or not sd.is_active:
         raise HTTPException(status_code=404, detail="standard_doc not found")
-    sd.is_active = False
+    # 物理级联删除：严格按 FK RESTRICT 顺序（规则全链 → 条款 → 段落 → 批次关联 → 文档本身）
+    delete_rules_for_doc(db, doc_id)
+    db.execute(delete(RegulationClause).where(RegulationClause.standard_doc_id == doc_id))
+    db.execute(delete(ParseSegment).where(ParseSegment.standard_doc_id == doc_id))
+    db.execute(delete(BatchRuleDoc).where(BatchRuleDoc.standard_doc_id == doc_id))
     if sd.file_id:
         fo = db.get(FileObject, sd.file_id)
         if fo is not None:
-            fo.deleted_at = datetime.now()  # 本地基准, 与 created_at 的 CURRENT_TIMESTAMP 一致
+            fo.deleted_at = datetime.now()  # file_object 维持软删
             db.add(fo)
-    db.add(sd)
+    db.delete(sd)  # 物理删 standard_doc
     db.commit()
