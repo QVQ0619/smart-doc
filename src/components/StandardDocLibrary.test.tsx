@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StandardDocLibrary from "./StandardDocLibrary";
 import * as api from "../api/standardDocs";
 import { toast } from "sonner";
+import { useRouteStore } from "../store/useRouteStore";
 
 // --- Blade SDK mock ---
 // vi.hoisted 确保变量在 vi.mock 工厂函数执行前已初始化
@@ -59,6 +60,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   // 重置 blade 状态
   _bladeState.activeSessionId = "session-123";
+  // 重置路由 store
+  useRouteStore.setState({ nav: { name: "home" } });
 
   vi.mocked(api.listStandardDocs).mockResolvedValue([sample] as never);
   vi.mocked(api.deleteStandardDoc).mockResolvedValue();
@@ -86,11 +89,11 @@ test("规则库页不再提供上传按钮（上传走聊天）", async () => {
   expect(screen.queryByRole("button", { name: "上传规则文件" })).not.toBeInTheDocument();
 });
 
-test("删除经确认调用 deleteStandardDoc", async () => {
+test("彻底删除经确认调用 deleteStandardDoc", async () => {
   renderLib();
   await screen.findByText("政策A");
-  await userEvent.click(screen.getByRole("button", { name: "删除" }));
-  await userEvent.click(await screen.findByRole("button", { name: /确.?定/ }));
+  await userEvent.click(screen.getByRole("button", { name: "彻底删除" }));
+  await userEvent.click(await screen.findByRole("button", { name: "确认彻底删除" }));
   await waitFor(() => expect(vi.mocked(api.deleteStandardDoc)).toHaveBeenCalledWith(1));
 });
 
@@ -377,4 +380,15 @@ test("点击查看原文件→预览弹窗出现(PDF 显示 iframe)", async () =
     expect(iframe).toBeTruthy();
     expect(iframe?.getAttribute("src")).toBe("/api/standard-docs/1/download");
   });
+});
+
+test("点击『查看规则』→ navigate rule-detail（无 batch）", async () => {
+  renderLib();
+  const btn = await screen.findAllByText("查看规则");
+  await userEvent.click(btn[0]);
+  const nav = useRouteStore.getState().nav;
+  expect(nav.name).toBe("rule-detail");
+  if (nav.name === "rule-detail") {
+    expect(nav.batchId).toBeUndefined();
+  }
 });

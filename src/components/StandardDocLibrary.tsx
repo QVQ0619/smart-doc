@@ -21,6 +21,7 @@ import {
   type RuleUpdate,
 } from "../api/standardDocs";
 import { useSessionStore, useChat } from "@blade-hq/agent-kit/react";
+import { useRouteStore } from "../store/useRouteStore";
 
 function humanSize(bytes: number | null): string {
   if (bytes == null) return "-";
@@ -258,6 +259,7 @@ export default function StandardDocLibrary() {
   const qc = useQueryClient();
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const { send } = useChat(activeSessionId ?? "");
+  const navigate = useRouteStore((s) => s.navigate);
   const [pending, setPending] = useState<{ docId: number; title: string; sawProcessing: boolean } | null>(null);
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
 
@@ -350,6 +352,14 @@ export default function StandardDocLibrary() {
       key: "actions",
       render: (_: unknown, row: StandardDoc) => (
         <Space>
+          <a
+            style={{ cursor: "pointer" }}
+            onClick={() =>
+              navigate({ name: "rule-detail", docId: row.id, docTitle: row.title })
+            }
+          >
+            查看规则
+          </a>
           <a style={{ cursor: "pointer" }}
              onClick={() => setPreview({ url: downloadStandardDocUrl(row.id), name: row.file_name })}>
             查看原文件
@@ -362,13 +372,15 @@ export default function StandardDocLibrary() {
             重新识别
           </Button>
           <Popconfirm
-            title="确认删除该规则文件？"
-            okText="确定"
+            title="彻底删除该规则文件？"
+            description="将永久删除该规则文件及其全部条款、审查规则、配置包，并从所有批次解绑，不可恢复。"
+            okText="确认彻底删除"
+            okButtonProps={{ danger: true }}
             cancelText="取消"
             onConfirm={() => deleteMut.mutate(row.id)}
           >
             <Button type="link" danger>
-              删除
+              彻底删除
             </Button>
           </Popconfirm>
         </Space>
