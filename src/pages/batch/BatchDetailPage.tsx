@@ -3,6 +3,7 @@ import {
   Breadcrumb,
   Button,
   Descriptions,
+  Popconfirm,
   Space,
   Spin,
   Table,
@@ -11,8 +12,9 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useQuery } from "@tanstack/react-query";
-import { getBatchDetail } from "../../api/batches";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getBatchDetail, unbindRuleDoc } from "../../api/batches";
+import { toast } from "sonner";
 import { listConfigPackages, type ConfigPackage } from "../../api/configPackages";
 import {
   downloadStandardDocUrl,
@@ -58,9 +60,18 @@ export default function BatchDetailPage({ batchId, batchTitle }: Props) {
     null,
   );
 
+  const qc = useQueryClient();
   const detailQuery = useQuery({
     queryKey: ["batch-detail", batchId],
     queryFn: () => getBatchDetail(batchId),
+  });
+  const unbindMut = useMutation({
+    mutationFn: (docId: number) => unbindRuleDoc(batchId, docId),
+    onSuccess: () => {
+      toast.success("已从批次移除");
+      qc.invalidateQueries({ queryKey: ["batch-detail", batchId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
   });
 
   const configQuery = useQuery({
@@ -127,6 +138,17 @@ export default function BatchDetailPage({ batchId, batchTitle }: Props) {
             >
               原文
             </Button>
+            <Popconfirm
+              title="从本批次移除该规则文件？"
+              description="仅解除与本批次的绑定，规则文件本身及其他批次不受影响。"
+              okText="确认移除"
+              cancelText="取消"
+              onConfirm={() => unbindMut.mutate(doc.id)}
+            >
+              <Button size="small" danger>
+                从批次移除
+              </Button>
+            </Popconfirm>
           </Space>
         }
       />

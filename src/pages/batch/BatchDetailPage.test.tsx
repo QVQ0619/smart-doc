@@ -153,6 +153,20 @@ describe("BatchDetailPage", () => {
     expect(useRouteStore.getState().nav).toMatchObject({ name: "batch-list" });
   });
 
+  it("点击'从批次移除' → 确认后调用 unbindRuleDoc(batchId, docId)", async () => {
+    const spy = vi
+      .spyOn(batchApi, "unbindRuleDoc")
+      .mockResolvedValue(undefined);
+    renderWithQuery(<BatchDetailPage batchId={5} batchTitle="B-2026-05" />);
+    await waitFor(() =>
+      expect(screen.getAllByText("从批次移除").length).toBeGreaterThan(0),
+    );
+    await userEvent.click(screen.getAllByText("从批次移除")[0]);
+    // Popconfirm 确认
+    await userEvent.click(await screen.findByText("确认移除"));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith(5, 11));
+  });
+
   it("规则库 Tab 卡片显示 clause_count 和 rule_count 计数", async () => {
     const detailWithCounts = {
       ...mockDetail,

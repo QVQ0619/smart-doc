@@ -75,3 +75,10 @@ export function listBatchPackages(id: number): Promise<MaterialPackage[]> {
     handle<MaterialPackage[]>(r),
   );
 }
+
+export function unbindRuleDoc(batchId: number, docId: number): Promise<void> {
+  return fetch(`/api/batches/${batchId}/standard-docs/${docId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  }).then((r) => handle<void>(r));
+}
