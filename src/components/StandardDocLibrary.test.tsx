@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StandardDocLibrary from "./StandardDocLibrary";
@@ -32,12 +32,6 @@ vi.mock("../api/standardDocs", async () => {
     listStandardDocs: vi.fn(),
     deleteStandardDoc: vi.fn(),
     recognizeStandardDoc: vi.fn(),
-    listClauses: vi.fn(),
-    listRules: vi.fn(),
-    updateClause: vi.fn(),
-    deleteClause: vi.fn(),
-    updateRule: vi.fn(),
-    deleteRule: vi.fn(),
   };
 });
 
@@ -68,14 +62,6 @@ beforeEach(() => {
   vi.mocked(api.recognizeStandardDoc).mockResolvedValue({
     doc_id: 1, doc_code: "SD-abc", recognition_status: "processing", segment_count: 9, page_count: 2, error: null,
   } as never);
-  vi.mocked(api.listClauses).mockResolvedValue([
-    { id: 1, clause_no: "第一条", clause_text: "申请人应当具有高级职称。", source_segment_id: 5, page_no: 2, locator: { page: 2, block_index: 1 } },
-  ] as never);
-  vi.mocked(api.listRules).mockResolvedValue([] as never);
-  vi.mocked(api.updateClause).mockResolvedValue({} as never);
-  vi.mocked(api.deleteClause).mockResolvedValue();
-  vi.mocked(api.updateRule).mockResolvedValue({} as never);
-  vi.mocked(api.deleteRule).mockResolvedValue();
 });
 
 test("渲染列表中的规则文件标题", async () => {
@@ -158,18 +144,6 @@ test("无会话时点重新识别只显示提示不调API", async () => {
   warnSpy.mockRestore();
 });
 
-test("展开文档行显示抽取的条款与出处", async () => {
-  const { container } = renderLib();
-  await screen.findByText("政策A");
-  const expandBtn = container.querySelector(".ant-table-row-expand-icon") as HTMLElement;
-  await userEvent.click(expandBtn);
-  // 展开后默认显示「审查规则」Tab，切换到「依据条款」Tab
-  await userEvent.click(await screen.findByText("依据条款"));
-  expect(await screen.findByText("第一条")).toBeInTheDocument();
-  expect(await screen.findByText("申请人应当具有高级职称。")).toBeInTheDocument();
-  expect(await screen.findByText(/第2页/)).toBeInTheDocument();
-});
-
 test("规则库页挂载时每 10 秒轮询刷新列表", async () => {
   vi.useFakeTimers();
   try {
@@ -184,104 +158,6 @@ test("规则库页挂载时每 10 秒轮询刷新列表", async () => {
   } finally {
     vi.useRealTimers();
   }
-});
-
-test("条款行点编辑→改条文→保存调 updateClause", async () => {
-  const { container } = renderLib();
-  await screen.findByText("政策A");
-  await userEvent.click(container.querySelector(".ant-table-row-expand-icon") as HTMLElement);
-  await userEvent.click(await screen.findByText("依据条款"));
-  const row = container.querySelector(".ant-table-expanded-row") as HTMLElement;
-  await userEvent.click(within(row).getByText("编辑"));
-  await screen.findByText("编辑条款");                         // Modal 标题
-  await userEvent.click(screen.getByRole("button", { name: /保.?存/ }));
-  await waitFor(() => expect(vi.mocked(api.updateClause)).toHaveBeenCalledWith(
-    1, 1, { clause_no: "第一条", clause_text: "申请人应当具有高级职称。" },
-  ));
-});
-
-test("条款行点删除→确认调 deleteClause", async () => {
-  const { container } = renderLib();
-  await screen.findByText("政策A");
-  await userEvent.click(container.querySelector(".ant-table-row-expand-icon") as HTMLElement);
-  await userEvent.click(await screen.findByText("依据条款"));
-  const row = container.querySelector(".ant-table-expanded-row") as HTMLElement;
-  await userEvent.click(within(row).getByText("删除"));
-  await userEvent.click(await screen.findByRole("button", { name: /确.?定/ }));
-  await waitFor(() => expect(vi.mocked(api.deleteClause)).toHaveBeenCalledWith(1, 1));
-});
-
-test("规则行点编辑→保存(沿用预填值)调 updateRule", async () => {
-  vi.mocked(api.listClauses).mockResolvedValue([] as never);
-  vi.mocked(api.listRules).mockResolvedValue([
-    {
-      id: 5, rule_code: "RULE-x", version: "V1.0", name: "规则A", logic: null,
-      dimension_code: "compliance", dimension_name: "合规性",
-      decision_type: "hard", disposition: "reject", binding_class: "common",
-      source_clause_id: 9, clause_no: "一", clause_text: "x", page_no: 1, locator: null,
-    },
-  ] as never);
-  const { container } = renderLib();
-  await screen.findByText("政策A");
-  await userEvent.click(container.querySelector(".ant-table-row-expand-icon") as HTMLElement);
-  const row = container.querySelector(".ant-table-expanded-row") as HTMLElement;
-  await within(row).findByText("规则A");
-  await userEvent.click(within(row).getByText("编辑"));
-  await screen.findByText("编辑规则");
-  await userEvent.click(screen.getByRole("button", { name: /保.?存/ }));
-  await waitFor(() => expect(vi.mocked(api.updateRule)).toHaveBeenCalledWith(1, 5, {
-    name: "规则A", logic: null, dimension_code: "compliance",
-    decision_type: "hard", disposition: "reject", binding_class: "common",
-  }));
-});
-
-test("规则行点删除→确认调 deleteRule", async () => {
-  vi.mocked(api.listClauses).mockResolvedValue([] as never);
-  vi.mocked(api.listRules).mockResolvedValue([
-    {
-      id: 5, rule_code: "RULE-x", version: "V1.0", name: "规则A", logic: null,
-      dimension_code: "compliance", dimension_name: "合规性",
-      decision_type: "hard", disposition: "reject", binding_class: "common",
-      source_clause_id: 9, clause_no: "一", clause_text: "x", page_no: 1, locator: null,
-    },
-  ] as never);
-  const { container } = renderLib();
-  await screen.findByText("政策A");
-  await userEvent.click(container.querySelector(".ant-table-row-expand-icon") as HTMLElement);
-  const row = container.querySelector(".ant-table-expanded-row") as HTMLElement;
-  await within(row).findByText("规则A");
-  await userEvent.click(within(row).getByText("删除"));
-  await userEvent.click(await screen.findByRole("button", { name: /确.?定/ }));
-  await waitFor(() => expect(vi.mocked(api.deleteRule)).toHaveBeenCalledWith(1, 5));
-});
-
-test("展开行规则 Tab 展示 review_rule 结构化字段与出处", async () => {
-  vi.mocked(api.listStandardDocs).mockResolvedValue([
-    {
-      id: 3, doc_code: "SD-x", title: "申请规定", file_name: "a.pdf",
-      size_bytes: 1, mime_type: "application/pdf", created_at: null,
-      recognition_status: "done",
-    },
-  ] as never);
-  vi.mocked(api.listClauses).mockResolvedValue([] as never);
-  vi.mocked(api.listRules).mockResolvedValue([
-    {
-      id: 1, rule_code: "RULE-abc", version: "V1.0", name: "同年限申请1项", logic: null,
-      dimension_code: "compliance", dimension_name: "合规性",
-      decision_type: "hard", disposition: "reject", binding_class: "common",
-      source_clause_id: 9, clause_no: "二(一)1", clause_text: "同年只能申请1项",
-      page_no: 5, locator: { page: 5, block_index: 0 },
-    },
-  ] as never);
-  const { container } = renderLib();
-  await screen.findByText("申请规定");
-  // 展开该文档行
-  const expandBtn = container.querySelector(".ant-table-row-expand-icon") as HTMLElement;
-  await userEvent.click(expandBtn);
-  await waitFor(() => expect(vi.mocked(api.listRules)).toHaveBeenCalledWith(3));
-  expect(await screen.findByText("同年限申请1项")).toBeInTheDocument();
-  expect(screen.getByText("合规性")).toBeInTheDocument();
-  expect(screen.getByText("第5页第1段")).toBeInTheDocument();
 });
 
 test("processing 状态显示识别中徽标", async () => {
