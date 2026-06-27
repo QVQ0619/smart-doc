@@ -4,6 +4,7 @@ import {
   ProfileOutlined,
   FileDoneOutlined,
   AppstoreOutlined,
+  DatabaseOutlined,
   InfoCircleOutlined,
 } from "@ant-design/icons";
 import type { ReactNode } from "react";
@@ -14,6 +15,7 @@ export type RouteKey =
   | "review-tasks"
   | "review-report"
   | "batch-list"
+  | "rule-library"
   | "about";
 
 export interface MenuItemDef {
@@ -44,6 +46,7 @@ export const MENU_GROUPS: MenuGroupDef[] = [
     title: "资源",
     items: [
       { key: "batch-list", label: "项目批次", icon: <AppstoreOutlined /> },
+      { key: "rule-library", label: "规则库", icon: <DatabaseOutlined /> },
     ],
   },
   {

@@ -12,6 +12,7 @@ import AboutPage from "./pages/about/AboutPage";
 import BatchListPage from "./pages/batch/BatchListPage";
 import BatchDetailPage from "./pages/batch/BatchDetailPage";
 import RuleDetailPage from "./pages/batch/RuleDetailPage";
+import RuleLibraryPage from "./pages/library/RuleLibraryPage";
 
 function renderMain(n: Nav): ReactNode {
   switch (n.name) {
@@ -27,6 +28,8 @@ function renderMain(n: Nav): ReactNode {
       return <AboutPage />;
     case "batch-list":
       return <BatchListPage />;
+    case "rule-library":
+      return <RuleLibraryPage />;
     case "batch-detail":
       return <BatchDetailPage batchId={n.batchId} batchTitle={n.batchTitle} />;
     case "rule-detail":

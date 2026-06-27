@@ -26,6 +26,11 @@ vi.mock("./pages/batch/RuleDetailPage", () => ({
   ),
 }));
 
+// 隔离 RuleLibraryPage 的真实依赖，聚焦路由切换
+vi.mock("./pages/library/RuleLibraryPage", () => ({
+  default: () => <div data-testid="rule-library-page" />,
+}));
+
 beforeEach(() => {
   useRouteStore.setState({ nav: { name: "home" } });
 });
@@ -59,4 +64,10 @@ test("nav 为 rule-detail 渲染规则详情页含 docId", async () => {
   const el = await screen.findByTestId("rule-detail-page");
   expect(el).toBeInTheDocument();
   expect(el.textContent).toContain("#5");
+});
+
+test("nav 为 rule-library 渲染规则库页", async () => {
+  useRouteStore.setState({ nav: { name: "rule-library" } });
+  render(<App />);
+  expect(await screen.findByTestId("rule-library-page")).toBeInTheDocument();
 });
