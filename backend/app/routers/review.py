@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from urllib.parse import quote as _urlquote
+
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlmodel import Session
 
 from ..auth import require_api_key
 from ..db import get_session
+from ..report_builder import build_report_model
+from ..reporting import package_zip, render_docx, render_pdf
 from ..review_execution import (apply_review, bind_package_config, get_review_input,
                                 get_review_results, review_action, ConflictError)
 from ..schemas import (BindConfigIn, BindConfigResult, CheckOut, ReviewActionIn, ReviewApplyIn,
@@ -67,3 +71,21 @@ def post_review_action(round_check_id: int, body: ReviewActionIn,
         raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.get("/packages/{package_id}/report/export")
+def export_report(package_id: int, db: Session = Depends(get_session)) -> Response:
+    try:
+        m = build_report_model(db, package_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    docx_bytes = render_docx(m)
+    pdf_bytes = render_pdf(m)
+    base = f"立项审查报告_包{package_id}"
+    zip_bytes = package_zip({f"{base}.docx": docx_bytes, f"{base}.pdf": pdf_bytes})
+    fname = f"{base}.zip"
+    disposition = f"attachment; filename=report_{package_id}.zip; filename*=UTF-8''{_urlquote(fname)}"
+    return Response(content=zip_bytes, media_type="application/zip",
+                    headers={"Content-Disposition": disposition})
