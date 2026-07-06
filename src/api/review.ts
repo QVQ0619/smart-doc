@@ -63,3 +63,31 @@ export function postReviewAction(roundCheckId: number, body: ReviewActionBody): 
     body: JSON.stringify(body),
   }).then((r) => handle<ReviewCheck>(r));
 }
+
+function filenameFromDisposition(cd: string, fallback: string): string {
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+  if (star) {
+    try { return decodeURIComponent(star[1]); } catch { /* ignore */ }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(cd);
+  return plain ? plain[1] : fallback;
+}
+
+export async function exportPackageReport(packageId: number): Promise<void> {
+  const res = await fetch(`/api/packages/${packageId}/report/export`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get("Content-Disposition") ?? "";
+  const filename = filenameFromDisposition(cd, `立项审查报告_包${packageId}.zip`);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
