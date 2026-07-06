@@ -1,10 +1,16 @@
 import { render, screen } from "@testing-library/react";
 import App from "./App";
 import { useRouteStore } from "./store/useRouteStore";
+import { useAuthStore } from "./store/useAuthStore";
 
 // 隔离右栏 ChatPanel 的真实依赖，聚焦路由切换
 vi.mock("./layout/ChatPanel", () => ({
   default: () => <div data-testid="chat-panel-stub" />,
+}));
+
+// 隔离 DashboardPage 的统计接口依赖，聚焦路由切换
+vi.mock("./pages/dashboard/DashboardPage", () => ({
+  default: () => <div data-testid="dashboard-page" />,
 }));
 
 // 隔离 BatchListPage 的 QueryClient 依赖，聚焦路由切换
@@ -32,14 +38,18 @@ vi.mock("./pages/library/RuleLibraryPage", () => ({
 }));
 
 beforeEach(() => {
-  useRouteStore.setState({ nav: { name: "my-tasks" } });
+  useRouteStore.setState({ nav: { name: "dashboard" } });
+  // App 有登录门:未登录渲染 LoginPage。测试统一以已登录评审专家身份进入。
+  useAuthStore.setState({
+    token: "t",
+    user: { id: 2, username: "reviewer1", display_name: "评审专家一", roles: ["reviewer"], primary_role: "reviewer" },
+    isAdmin: false,
+  });
 });
 
-test("默认渲染工作台页", async () => {
+test("默认渲染仪表盘页", async () => {
   render(<App />);
-  expect(
-    await screen.findByRole("heading", { name: "工作台" }),
-  ).toBeInTheDocument();
+  expect(await screen.findByTestId("dashboard-page")).toBeInTheDocument();
 });
 
 test("nav 为 batch-list 渲染项目批次页", async () => {

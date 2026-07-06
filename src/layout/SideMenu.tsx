@@ -1,13 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { Menu, Button, Tooltip, Tag } from "antd";
+import { useMemo } from "react";
+import { Menu, Avatar, Dropdown, Tag, theme } from "antd";
 import type { MenuProps } from "antd";
-import { MenuFoldOutlined, MenuUnfoldOutlined, LogoutOutlined } from "@ant-design/icons";
+import {
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  LogoutOutlined,
+} from "@ant-design/icons";
 import { MENU_GROUPS, type RouteKey } from "./menuConfig";
 import { useRouteStore } from "../store/useRouteStore";
 import { useMenuCollapseStore } from "../store/useMenuCollapseStore";
 import { useAuthStore } from "../store/useAuthStore";
 
+// 白色主题侧边栏,样式对齐 blade-oauth 的 AdminLayout:
+// 品牌主色标题 + antd Menu 分组标签 + 头像 Dropdown 退出 + 底部裸图标折叠行。
 export default function SideMenu() {
+  const { token: t } = theme.useToken();
   const nav = useRouteStore((s) => s.nav);
   const navigate = useRouteStore((s) => s.navigate);
   const collapsed = useMenuCollapseStore((s) => s.collapsed);
@@ -16,30 +23,17 @@ export default function SideMenu() {
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const logout = useAuthStore((s) => s.logout);
 
-  // 按当前角色过滤;每个分组做成可折叠子菜单(点击一级标题展开/收起)。
+  // 按当前角色过滤,保持原有扁平菜单结构(不加分组标签)
   const role = isAdmin ? "admin" : "reviewer";
-  const groups = useMemo(
+  const items: MenuProps["items"] = useMemo(
     () =>
-      MENU_GROUPS.map((g) => ({
-        title: g.title,
-        items: g.items.filter((it) => !it.roles || it.roles.includes(role)),
-      })).filter((g) => g.items.length > 0),
+      MENU_GROUPS.flatMap((g) => g.items)
+        .filter((it) => !it.roles || it.roles.includes(role))
+        .map((it) => ({ key: it.key, icon: it.icon, label: it.label })),
     [role],
   );
-  const groupKey = (title: string) => `grp:${title}`;
-  // 单项分组直接渲染为独立菜单项(如 仪表盘/关于流程/任务管理);多项分组渲染为可折叠子菜单。
-  const items: MenuProps["items"] = groups.map((g) => {
-    if (g.items.length === 1) {
-      const it = g.items[0];
-      return { key: it.key, icon: it.icon, label: it.label };
-    }
-    return {
-      key: groupKey(g.title),
-      label: g.title,
-      children: g.items.map((it) => ({ key: it.key, icon: it.icon, label: it.label })),
-    };
-  });
 
+  // 详情类路由高亮到其所属的一级菜单项
   const selectedKey =
     nav.name === "batch-detail"
       ? "batch-list"
@@ -51,95 +45,99 @@ export default function SideMenu() {
           ? "my-tasks"
           : nav.name;
 
-  // 让当前选中项所在分组保持展开
-  const selectedGroupKey = useMemo(() => {
-    const g = groups.find((grp) => grp.items.length > 1 && grp.items.some((it) => it.key === selectedKey));
-    return g ? groupKey(g.title) : undefined;
-  }, [groups, selectedKey]);
-  const [openKeys, setOpenKeys] = useState<string[]>(selectedGroupKey ? [selectedGroupKey] : []);
-  useEffect(() => {
-    if (selectedGroupKey) {
-      setOpenKeys((prev) => (prev.includes(selectedGroupKey) ? prev : [...prev, selectedGroupKey]));
-    }
-  }, [selectedGroupKey]);
-
-  if (collapsed) {
-    return (
-      <div className="menu-rail">
-        <Tooltip title="展开菜单" placement="right">
-          <Button
-            size="small"
-            aria-label="展开菜单"
-            icon={<MenuUnfoldOutlined />}
-            onClick={toggle}
-          />
-        </Tooltip>
-        <span className="menu-rail__label">菜单</span>
-      </div>
-    );
-  }
+  const userMenu: MenuProps = {
+    items: [{ key: "logout", icon: <LogoutOutlined />, label: "退出登录", danger: true }],
+    onClick: ({ key }) => {
+      if (key === "logout") logout();
+    },
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {/* 品牌 */}
       <div
         style={{
-          padding: "16px 20px",
+          flexShrink: 0,
+          padding: collapsed ? "20px 8px 12px" : "20px 16px 12px",
+          textAlign: "center",
           fontWeight: 700,
-          fontSize: 15,
-          color: "#1677ff",
-          borderBottom: "1px solid #f0f0f0",
+          fontSize: collapsed ? 16 : 15,
+          lineHeight: "22px",
+          color: t.colorPrimary,
         }}
       >
-        装备研制立项AI辅助审查评估系统
+        {collapsed ? "审" : "装备研制立项AI辅助审查评估系统"}
       </div>
-      {/* 菜单区占据剩余空间，把页脚顶到最底 */}
-      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          openKeys={openKeys}
-          onOpenChange={(keys) => setOpenKeys(keys as string[])}
-          items={items}
-          style={{ borderInlineEnd: "none" }}
-          onClick={(info) => navigate({ name: info.key as RouteKey })}
-        />
-      </div>
+
+      {/* 菜单 */}
+      <Menu
+        mode="inline"
+        inlineCollapsed={collapsed}
+        selectedKeys={[selectedKey]}
+        items={items}
+        onClick={({ key }) => navigate({ name: key as RouteKey })}
+        style={{ borderInlineEnd: 0, flex: 1, minHeight: 0, overflowY: "auto" }}
+      />
+
+      {/* 用户信息 */}
       {user && (
-        <div style={{ borderTop: "1px solid #f0f0f0" }}>
-          {/* 用户名 + 退出登录 */}
-          <div
-            style={{
-              padding: "12px 20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-            }}
-          >
-            <div style={{ overflow: "hidden" }}>
-              <div style={{ fontWeight: 600, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
-                {user.display_name ?? user.username}
-              </div>
-              <Tag color={isAdmin ? "blue" : "green"} style={{ marginTop: 2 }}>
-                {isAdmin ? "管理员" : "评审专家"}
-              </Tag>
+        <div
+          style={{
+            flexShrink: 0,
+            borderTop: `1px solid ${t.colorBorderSecondary}`,
+            padding: collapsed ? "12px 0" : "12px 12px",
+          }}
+        >
+          <Dropdown menu={userMenu} placement="topRight" trigger={["click"]}>
+            <div
+              className="side-user-trigger"
+              style={{
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: collapsed ? "center" : "flex-start",
+                gap: 8,
+                padding: collapsed ? "4px 0" : 4,
+                borderRadius: t.borderRadius,
+              }}
+            >
+              <Avatar size="small" style={{ background: t.colorPrimary, flexShrink: 0 }}>
+                {(user.display_name ?? user.username).slice(0, 1)}
+              </Avatar>
+              {!collapsed && (
+                <>
+                  <span
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      fontSize: 13,
+                    }}
+                  >
+                    {user.display_name ?? user.username}
+                  </span>
+                  <Tag color={isAdmin ? "blue" : "green"} style={{ marginInlineEnd: 0 }}>
+                    {isAdmin ? "管理员" : "评审专家"}
+                  </Tag>
+                </>
+              )}
             </div>
-            <Tooltip title="退出登录">
-              <Button size="small" icon={<LogoutOutlined />} onClick={logout} aria-label="退出登录" />
-            </Tooltip>
-          </div>
-          {/* 灰线 + 折叠(无按钮边框,置于最下) */}
-          <div style={{ borderTop: "1px solid #f0f0f0" }}>
-            <Button
-              type="text"
-              icon={<MenuFoldOutlined />}
-              onClick={toggle}
-              aria-label="折叠菜单"
-              style={{ width: "100%", height: 40, color: "#8c8c8c", borderRadius: 0 }}
-            />
-          </div>
+          </Dropdown>
         </div>
       )}
+
+      {/* 折叠开关 */}
+      <div
+        role="button"
+        aria-label={collapsed ? "展开菜单" : "折叠菜单"}
+        className="side-collapse-toggle"
+        style={{ borderTop: `1px solid ${t.colorBorderSecondary}` }}
+        onClick={toggle}
+      >
+        {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+      </div>
     </div>
   );
 }

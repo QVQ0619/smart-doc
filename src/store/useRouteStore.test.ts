@@ -4,8 +4,9 @@ beforeEach(() => {
   useRouteStore.setState({ nav: { name: "my-tasks" } });
 });
 
-test("默认 nav.name 是 home", () => {
-  expect(useRouteStore.getState().nav.name).toBe("home");
+test("默认 nav.name 是 dashboard", () => {
+  // beforeEach 已改写运行时 state,这里取 store 初始快照校验默认路由
+  expect(useRouteStore.getInitialState().nav.name).toBe("dashboard");
 });
 
 test("navigate 切换简单路由", () => {
