@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { Menu, Button, Tooltip, Tag } from "antd";
-import type { MenuProps } from "antd";
-import { MenuFoldOutlined, MenuUnfoldOutlined, LogoutOutlined } from "@ant-design/icons";
+import { useMemo } from "react";
+import { Tooltip } from "antd";
+import {
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  LogoutOutlined,
+  SafetyCertificateFilled,
+} from "@ant-design/icons";
 import { MENU_GROUPS, type RouteKey } from "./menuConfig";
 import { useRouteStore } from "../store/useRouteStore";
 import { useMenuCollapseStore } from "../store/useMenuCollapseStore";
@@ -16,7 +20,7 @@ export default function SideMenu() {
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const logout = useAuthStore((s) => s.logout);
 
-  // 按当前角色过滤;每个分组做成可折叠子菜单(点击一级标题展开/收起)。
+  // 按当前角色过滤菜单项
   const role = isAdmin ? "admin" : "reviewer";
   const groups = useMemo(
     () =>
@@ -26,20 +30,8 @@ export default function SideMenu() {
       })).filter((g) => g.items.length > 0),
     [role],
   );
-  const groupKey = (title: string) => `grp:${title}`;
-  // 单项分组直接渲染为独立菜单项(如 仪表盘/关于流程/任务管理);多项分组渲染为可折叠子菜单。
-  const items: MenuProps["items"] = groups.map((g) => {
-    if (g.items.length === 1) {
-      const it = g.items[0];
-      return { key: it.key, icon: it.icon, label: it.label };
-    }
-    return {
-      key: groupKey(g.title),
-      label: g.title,
-      children: g.items.map((it) => ({ key: it.key, icon: it.icon, label: it.label })),
-    };
-  });
 
+  // 详情类路由高亮到其所属的一级菜单项
   const selectedKey =
     nav.name === "batch-detail"
       ? "batch-list"
@@ -51,93 +43,90 @@ export default function SideMenu() {
           ? "my-tasks"
           : nav.name;
 
-  // 让当前选中项所在分组保持展开
-  const selectedGroupKey = useMemo(() => {
-    const g = groups.find((grp) => grp.items.length > 1 && grp.items.some((it) => it.key === selectedKey));
-    return g ? groupKey(g.title) : undefined;
-  }, [groups, selectedKey]);
-  const [openKeys, setOpenKeys] = useState<string[]>(selectedGroupKey ? [selectedGroupKey] : []);
-  useEffect(() => {
-    if (selectedGroupKey) {
-      setOpenKeys((prev) => (prev.includes(selectedGroupKey) ? prev : [...prev, selectedGroupKey]));
-    }
-  }, [selectedGroupKey]);
-
   if (collapsed) {
     return (
-      <div className="menu-rail">
+      <div className="menu-rail menu-rail--dark">
         <Tooltip title="展开菜单" placement="right">
-          <Button
-            size="small"
+          <button
+            type="button"
+            className="side-menu__icon-btn"
             aria-label="展开菜单"
-            icon={<MenuUnfoldOutlined />}
             onClick={toggle}
-          />
+          >
+            <MenuUnfoldOutlined />
+          </button>
         </Tooltip>
         <span className="menu-rail__label">菜单</span>
       </div>
     );
   }
 
+  // 扁平序号:入场动效按序错峰
+  let flatIdx = 0;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div
-        style={{
-          padding: "16px 20px",
-          fontWeight: 700,
-          fontSize: 15,
-          color: "#1677ff",
-          borderBottom: "1px solid #f0f0f0",
-        }}
-      >
-        装备研制立项AI辅助审查评估系统
+    <div className="side-menu">
+      <div className="side-menu__brand">
+        <div className="side-menu__emblem">
+          <SafetyCertificateFilled />
+        </div>
+        <div className="side-menu__brand-text">
+          <span className="side-menu__brand-eyebrow">装备研制立项</span>
+          <span className="side-menu__brand-title">AI辅助审查评估系统</span>
+        </div>
       </div>
-      {/* 菜单区占据剩余空间，把页脚顶到最底 */}
-      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          openKeys={openKeys}
-          onOpenChange={(keys) => setOpenKeys(keys as string[])}
-          items={items}
-          style={{ borderInlineEnd: "none" }}
-          onClick={(info) => navigate({ name: info.key as RouteKey })}
-        />
-      </div>
+
+      <nav className="side-menu__nav">
+        {groups.map((g) => (
+          <div key={g.title}>
+            {g.items.length > 1 && <div className="side-menu__group-title">{g.title}</div>}
+            {g.items.map((it) => {
+              const active = it.key === selectedKey;
+              const idx = flatIdx++;
+              return (
+                <button
+                  key={it.key}
+                  type="button"
+                  className={"side-menu__item" + (active ? " side-menu__item--active" : "")}
+                  style={{ animationDelay: `${idx * 30}ms` }}
+                  onClick={() => navigate({ name: it.key as RouteKey })}
+                >
+                  <span className="side-menu__item-icon">{it.icon}</span>
+                  <span className="side-menu__item-label">{it.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+
       {user && (
-        <div style={{ borderTop: "1px solid #f0f0f0" }}>
-          {/* 用户名 + 退出登录 */}
-          <div
-            style={{
-              padding: "12px 20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-            }}
-          >
-            <div style={{ overflow: "hidden" }}>
-              <div style={{ fontWeight: 600, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
-                {user.display_name ?? user.username}
-              </div>
-              <Tag color={isAdmin ? "blue" : "green"} style={{ marginTop: 2 }}>
+        <div className="side-menu__footer">
+          <div className="side-menu__user">
+            <div className="side-menu__avatar">
+              {(user.display_name ?? user.username).slice(0, 1)}
+            </div>
+            <div className="side-menu__user-meta">
+              <div className="side-menu__user-name">{user.display_name ?? user.username}</div>
+              <span className={"side-menu__role" + (isAdmin ? " side-menu__role--admin" : "")}>
                 {isAdmin ? "管理员" : "评审专家"}
-              </Tag>
+              </span>
             </div>
             <Tooltip title="退出登录">
-              <Button size="small" icon={<LogoutOutlined />} onClick={logout} aria-label="退出登录" />
+              <button
+                type="button"
+                className="side-menu__icon-btn"
+                aria-label="退出登录"
+                onClick={logout}
+              >
+                <LogoutOutlined />
+              </button>
             </Tooltip>
           </div>
-          {/* 灰线 + 折叠(无按钮边框,置于最下) */}
-          <div style={{ borderTop: "1px solid #f0f0f0" }}>
-            <Button
-              type="text"
-              icon={<MenuFoldOutlined />}
-              onClick={toggle}
-              aria-label="折叠菜单"
-              style={{ width: "100%", height: 40, color: "#8c8c8c", borderRadius: 0 }}
-            />
-          </div>
+          <button type="button" className="side-menu__collapse" aria-label="折叠菜单" onClick={toggle}>
+            <MenuFoldOutlined />
+            <span>收起导航</span>
+          </button>
         </div>
       )}
     </div>
