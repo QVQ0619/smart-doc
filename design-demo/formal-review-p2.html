@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>形式审查 · P2 设计演示（报告 / 概览 / 多轮）</title>
+<style>
+  :root{
+    --success:#52c41a; --success-bg:#f6ffed; --success-bd:#b7eb8f;
+    --warning:#faad14; --warning-bg:#fffbe6; --warning-bd:#ffe58f;
+    --error:#ff4d4f;   --error-bg:#fff1f0;   --error-bd:#ffccc7;
+    --neutral:#8c8c8c; --neutral-bg:#fafafa;
+    --ink:#1d2129; --sub:#86909c; --line:#e5e6eb; --primary:#2f6bff; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:#f5f6f8; color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; font-size:14px; line-height:1.6;}
+  .wrap{max-width:1080px; margin:0 auto; padding:24px 24px 64px;}
+  .demo-flag{font-size:12px; color:var(--sub); margin-bottom:14px;}
+  .demo-flag b{color:var(--primary);}
+  .ph h1{margin:0; font-size:20px; font-weight:600;}
+  .ph p{margin:4px 0 0; color:var(--sub); font-size:13px;}
+
+  /* tabs */
+  .tabs{display:flex; gap:6px; margin:16px 0 0; border-bottom:1px solid var(--line);}
+  .tab{padding:10px 18px; cursor:pointer; font-size:14px; color:var(--sub); border-bottom:2px solid transparent; margin-bottom:-1px;}
+  .tab.active{color:var(--primary); border-bottom-color:var(--primary); font-weight:600;}
+  .panel{display:none;} .panel.active{display:block;}
+
+  .card{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:24px; margin-top:16px;}
+  .sec-t{font-size:15px; font-weight:600; margin:0 0 12px;}
+  .muted{color:var(--sub);} .mono{font-family:ui-monospace,Menlo,monospace;}
+
+  /* badges / pills */
+  .badge{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;font-size:11px;color:#fff;font-weight:700;vertical-align:middle;}
+  .b-pass{background:var(--success);} .b-fail{background:var(--error);} .b-review{background:var(--warning);}
+  .pill{display:inline-block; padding:1px 9px; border-radius:999px; font-weight:600; font-size:12px;}
+  .pill.fail{background:var(--error-bg); color:var(--error);} .pill.review{background:var(--warning-bg); color:#ad6800;} .pill.ok{background:var(--success-bg); color:#389e0d;}
+
+  /* ===== charts (CSS/SVG 手搓) ===== */
+  .donut{width:140px;height:140px;border-radius:50%; position:relative; flex:0 0 140px;}
+  .donut::after{content:""; position:absolute; inset:22px; background:#fff; border-radius:50%;}
+  .donut .ctr{position:absolute; inset:0; display:grid; place-items:center; z-index:1; text-align:center;}
+  .donut .ctr b{font-size:24px;} .donut .ctr span{font-size:12px; color:var(--sub);}
+  .legend{display:flex; flex-direction:column; gap:8px; font-size:13px;}
+  .legend .li{display:flex; align-items:center; gap:8px;}
+  .legend .li i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+  .dimbar{display:flex; flex-direction:column; gap:12px;}
+  .dimrow{display:grid; grid-template-columns:90px 1fr 56px; align-items:center; gap:10px; font-size:13px;}
+  .track{height:14px; border-radius:7px; background:#eef0f3; overflow:hidden; display:flex;}
+  .track > span{height:100%;}
+  .track .s-pass{background:var(--success);} .track .s-fail{background:var(--error);} .track .s-review{background:var(--warning);}
+
+  /* ===== report (打印文档) ===== */
+  .toolbar{display:flex; justify-content:flex-end; gap:10px; margin-top:16px;}
+  .btn{font-size:13px; border-radius:8px; padding:7px 16px; cursor:pointer; border:1px solid var(--line); background:#fff;}
+  .btn.primary{background:var(--primary); color:#fff; border-color:var(--primary);}
+  .btn:hover{filter:brightness(.99); border-color:#c9ced6;}
+  .sheet{background:#fff; border:1px solid var(--line); border-radius:8px; margin-top:14px; padding:40px 48px;
+    box-shadow:0 1px 12px rgba(0,0,0,.05);}
+  .rpt-h{text-align:center; border-bottom:2px solid var(--ink); padding-bottom:16px; margin-bottom:8px;}
+  .rpt-h h2{margin:0; font-size:24px; letter-spacing:4px;}
+  .rpt-meta{display:flex; justify-content:space-between; font-size:13px; color:#4e5969; margin-top:18px;}
+  .rpt-concl{margin:18px 0; padding:14px 18px; border-radius:8px; background:var(--warning-bg); border:1px solid var(--warning-bd);
+    font-size:16px; font-weight:700; color:#ad6800; display:flex; align-items:center; gap:10px;}
+  .rpt-sec{margin-top:26px;} .rpt-sec h3{font-size:15px; margin:0 0 12px; padding-left:9px; border-left:3px solid var(--primary);}
+  .prob{border:1px solid var(--line); border-left:3px solid var(--error); border-radius:6px; padding:12px 14px; margin-bottom:10px;}
+  .prob .pt{font-weight:600;} .prob .pd{margin-top:5px;} .prob .px{font-size:13px; color:var(--sub); margin-top:5px;}
+  .prob.rv{border-left-color:var(--warning);}
+  table.tbl{width:100%; border-collapse:collapse; font-size:13px;}
+  table.tbl th,table.tbl td{border:1px solid var(--line); padding:7px 10px; text-align:left;}
+  table.tbl th{background:var(--neutral-bg); color:#4e5969; font-weight:600;}
+  .sign{display:flex; justify-content:flex-end; gap:60px; margin-top:36px; font-size:13px; color:#4e5969;}
+
+  /* ===== dashboard ===== */
+  .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:14px;}
+  .kpi{border:1px solid var(--line); border-radius:10px; padding:16px;}
+  .kpi .lab{color:var(--sub); font-size:13px;}
+  .kpi .num{font-size:30px; font-weight:700; margin-top:4px;}
+  .kpi .num small{font-size:14px; color:var(--sub); font-weight:400;}
+  .attn{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border:1px solid var(--line);
+    border-radius:8px; margin-top:8px;}
+  .attn .ai{display:flex; align-items:center; gap:10px;}
+  .sdot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .link{color:var(--primary); cursor:pointer; font-size:13px;}
+
+  /* ===== rounds ===== */
+  .timeline{display:flex; align-items:center; gap:0; margin:10px 0 24px;}
+  .tl-node{display:flex; flex-direction:column; align-items:center; gap:6px; min-width:120px;}
+  .tl-dot{width:16px;height:16px;border-radius:50%; border:3px solid #fff; box-shadow:0 0 0 2px var(--line);}
+  .tl-dot.done{background:var(--error); box-shadow:0 0 0 2px var(--error);}
+  .tl-dot.done.fix{background:var(--warning); box-shadow:0 0 0 2px var(--warning);}
+  .tl-dot.cur{background:var(--primary); box-shadow:0 0 0 2px var(--primary);}
+  .tl-line{flex:1; height:2px; background:var(--line);}
+  .tl-cap{font-size:12px; text-align:center; color:#4e5969;}
+  .diffcol{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;}
+  .diffbox{border:1px solid var(--line); border-radius:10px; padding:14px;}
+  .diffbox h4{margin:0 0 10px; font-size:14px; display:flex; align-items:center; gap:8px;}
+  .diffbox.fixed h4{color:var(--success);} .diffbox.open h4{color:var(--error);} .diffbox.newp h4{color:#ad6800;}
+  .ditem{font-size:13px; padding:7px 0; border-bottom:1px dashed var(--line);} .ditem:last-child{border:none;}
+
+  .toast{position:fixed; left:50%; bottom:30px; transform:translateX(-50%); background:#1d2129; color:#fff; padding:8px 16px;
+    border-radius:8px; font-size:13px; opacity:0; transition:.25s; pointer-events:none; z-index:60;}
+  .toast.show{opacity:.95;}
+
+  /* ===== 打印样式：只出报告，去掉壳 ===== */
+  @media print{
+    body{background:#fff;}
+    .demo-flag,.ph,.tabs,.toolbar,.no-print{display:none !important;}
+    .wrap{max-width:none; padding:0;}
+    .panel{display:none !important;} #tab-report{display:block !important;}
+    .sheet{border:none; box-shadow:none; margin:0; padding:0;}
+    .prob{break-inside:avoid;}
+    .rpt-sec{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="demo-flag">⚙ <b>P2 设计演示页</b>（独立 HTML，不接后端、不改项目代码，图表为 CSS/SVG 手搓、数据示例）。顶部切 3 个面：报告 / 概览 / 多轮。报告页「打印」可真的调起浏览器打印（选「另存为 PDF」即导出）。</div>
+  <div class="ph"><h1>形式审查</h1><p>交付与洞察：审查报告 · 工作台概览 · 多轮对比</p></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="report">📄 审查报告</div>
+    <div class="tab" data-tab="dash">📊 工作台概览</div>
+    <div class="tab" data-tab="rounds">🔁 多轮对比</div>
+  </div>
+
+  <!-- ============ Tab 1：审查报告 ============ -->
+  <div class="panel active" id="tab-report">
+    <div class="toolbar no-print">
+      <button class="btn" id="btnCopy">复制要点</button>
+      <button class="btn" id="btnPdf">⬇ 导出 PDF</button>
+      <button class="btn primary" id="btnPrint">🖨 打印</button>
+    </div>
+
+    <div class="sheet" id="reportSheet">
+      <div class="rpt-h"><h2>形 式 审 查 意 见 书</h2></div>
+      <div class="rpt-meta">
+        <div>申报包：<b>#12 国家自然科学基金面上项目</b><br/>申请单位：某大学某学院</div>
+        <div style="text-align:right">审查轮次：第 2 轮<br/>审查日期：2026-06-26</div>
+      </div>
+      <div class="rpt-concl">⚠ 审查结论：需整改（限期补正后复审）</div>
+
+      <!-- 概览 + 图表 -->
+      <div class="rpt-sec">
+        <h3>一、审查概览</h3>
+        <div style="display:flex; gap:36px; align-items:center; flex-wrap:wrap;">
+          <div class="donut" id="rptDonut">
+            <div class="ctr"><div><b>90%</b><span>通过率</span></div></div>
+          </div>
+          <div class="legend">
+            <div class="li"><i style="background:var(--success)"></i> 通过 18</div>
+            <div class="li"><i style="background:var(--error)"></i> 不通过 1</div>
+            <div class="li"><i style="background:var(--warning)"></i> 待复核 1</div>
+            <div class="li muted">共 20 条规则</div>
+          </div>
+          <div class="dimbar" style="flex:1; min-width:280px;">
+            <div class="dimrow"><span>申请人资格</span><div class="track"><span class="s-fail" style="width:25%"></span><span class="s-pass" style="width:75%"></span></div><span class="muted">3/4</span></div>
+            <div class="dimrow"><span>预算</span><div class="track"><span class="s-review" style="width:20%"></span><span class="s-pass" style="width:80%"></span></div><span class="muted">4/5</span></div>
+            <div class="dimrow"><span>合作单位</span><div class="track"><span class="s-pass" style="width:100%"></span></div><span class="muted">3/3</span></div>
+            <div class="dimrow"><span>附件材料</span><div class="track"><span class="s-pass" style="width:100%"></span></div><span class="muted">6/6</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 问题清单 -->
+      <div class="rpt-sec">
+        <h3>二、问题清单（不通过 / 需整改）</h3>
+        <div class="prob">
+          <div class="pt">1. [申请人资格] 负责人连续承担年限不满足　<span class="pill fail">不通过</span></div>
+          <div class="pd">负责人须满足近 3 年连续承担经历；材料显示 2022 年中断 1 年。</div>
+          <div class="px">依据：《国家自然科学基金申请规定》第十二条　·　出处：申请书·正文 第3段　·　处置意见：要求补充连续承担证明，否则不予立项。</div>
+        </div>
+        <div class="prob rv">
+          <div class="pt">2. [预算] 劳务费占比偏高　<span class="pill review">待复核</span></div>
+          <div class="pd">劳务费占比 38%，未超硬性上限但偏高。</div>
+          <div class="px">依据：《预算编制说明》　·　出处：预算明细 第5项　·　处置意见：请说明劳务费测算依据。</div>
+        </div>
+      </div>
+
+      <!-- 通过项摘要 -->
+      <div class="rpt-sec">
+        <h3>三、通过项（摘要）</h3>
+        <table class="tbl">
+          <tr><th style="width:140px">维度</th><th>结论</th><th style="width:90px">通过数</th></tr>
+          <tr><td>申请人资格</td><td>除上述问题外均符合要求</td><td>3</td></tr>
+          <tr><td>预算</td><td>总额、科目编制、说明均符合</td><td>4</td></tr>
+          <tr><td>合作单位</td><td>资质、盖章、分工齐全</td><td>3</td></tr>
+          <tr><td>附件材料</td><td>签字、证明、附件齐全</td><td>6</td></tr>
+        </table>
+      </div>
+
+      <div class="sign">
+        <div>复核人：________　dev</div>
+        <div>复核日期：2026-06-26</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Tab 2：工作台概览 ============ -->
+  <div class="panel" id="tab-dash">
+    <div class="card">
+      <div class="kpis">
+        <div class="kpi"><div class="lab">待复核</div><div class="num" style="color:var(--warning)">3 <small>个包</small></div></div>
+        <div class="kpi"><div class="lab">待出报告</div><div class="num" style="color:var(--primary)">2 <small>个包</small></div></div>
+        <div class="kpi"><div class="lab">本月已审</div><div class="num">12 <small>个</small></div></div>
+        <div class="kpi"><div class="lab">平均通过率</div><div class="num" style="color:var(--success)">78%</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex; gap:40px; align-items:center; flex-wrap:wrap;">
+      <div>
+        <div class="sec-t">总体结果分布</div>
+        <div style="display:flex; gap:24px; align-items:center;">
+          <div class="donut" id="dashDonut"><div class="ctr"><div><b>78%</b><span>通过率</span></div></div></div>
+          <div class="legend">
+            <div class="li"><i style="background:var(--success)"></i> 通过 234</div>
+            <div class="li"><i style="background:var(--error)"></i> 不通过 41</div>
+            <div class="li"><i style="background:var(--warning)"></i> 待复核 25</div>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1; min-width:300px;">
+        <div class="sec-t">各维度通过率（全部申报包累计）</div>
+        <div class="dimbar">
+          <div class="dimrow"><span>申请人资格</span><div class="track"><span class="s-fail" style="width:18%"></span><span class="s-pass" style="width:82%"></span></div><span class="muted">82%</span></div>
+          <div class="dimrow"><span>预算</span><div class="track"><span class="s-fail" style="width:14%"></span><span class="s-review" style="width:12%"></span><span class="s-pass" style="width:74%"></span></div><span class="muted">74%</span></div>
+          <div class="dimrow"><span>合作单位</span><div class="track"><span class="s-fail" style="width:8%"></span><span class="s-pass" style="width:92%"></span></div><span class="muted">92%</span></div>
+          <div class="dimrow"><span>附件材料</span><div class="track"><span class="s-pass" style="width:96%"></span><span class="s-fail" style="width:4%"></span></div><span class="muted">96%</span></div>
+        </div>
+        <div class="muted" style="font-size:12px; margin-top:10px;">💡 洞察：「预算」是问题高发维度（通过率最低 74%），可针对性加强填报指引。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec-t">需要关注（按问题数排序）</div>
+      <div class="attn"><div class="ai"><span class="sdot" style="background:var(--error)"></span><b>审查包 #12</b><span class="muted">国家自然科学基金面上项目 · 1 不通过 · 1 待复核</span></div><span class="link">去复核 ↗</span></div>
+      <div class="attn"><div class="ai"><span class="sdot" style="background:var(--warning)"></span><b>审查包 #15</b><span class="muted">青年科学基金 · 2 待复核</span></div><span class="link">去复核 ↗</span></div>
+      <div class="attn"><div class="ai"><span class="sdot" style="background:var(--success)"></span><b>审查包 #9</b><span class="muted">面上项目 · 全部通过 · 待出报告</span></div><span class="link">出报告 ↗</span></div>
+    </div>
+  </div>
+
+  <!-- ============ Tab 3：多轮对比 ============ -->
+  <div class="panel" id="tab-rounds">
+    <div class="card">
+      <div class="sec-t">审查包 #12 · 轮次时间线</div>
+      <div class="timeline">
+        <div class="tl-node"><div class="tl-dot done"></div><div class="tl-cap"><b>第 1 轮</b><br/>06-20<br/><span class="pill fail">建议不予立项</span></div></div>
+        <div class="tl-line"></div>
+        <div class="tl-node"><div class="tl-dot done fix"></div><div class="tl-cap"><b>第 2 轮</b><br/>06-26<br/><span class="pill review">需整改</span></div></div>
+        <div class="tl-line"></div>
+        <div class="tl-node"><div class="tl-dot cur"></div><div class="tl-cap"><b>复审中</b><br/>—</div></div>
+      </div>
+
+      <div class="sec-t" style="margin-top:8px;">第 1 轮 → 第 2 轮 变化对比</div>
+      <div class="muted" style="font-size:13px; margin-bottom:14px;">不通过 3 → 1，已整改 2 项 ✓，仍有 1 项未解决。</div>
+      <div class="diffcol">
+        <div class="diffbox fixed">
+          <h4><span class="badge b-pass">✓</span> 已整改 (2)</h4>
+          <div class="ditem">设备费占比超限 <span class="muted">→ 已降至 18%</span></div>
+          <div class="ditem">合作单位公章缺失 <span class="muted">→ 已补章</span></div>
+        </div>
+        <div class="diffbox open">
+          <h4><span class="badge b-fail">✕</span> 仍未解决 (1)</h4>
+          <div class="ditem">负责人连续承担年限不满足 <span class="muted">→ 仍缺连续承担证明</span></div>
+        </div>
+        <div class="diffbox newp">
+          <h4><span class="badge b-review">!</span> 新增 / 待复核 (1)</h4>
+          <div class="ditem">劳务费占比偏高 <span class="muted">→ 本轮新触发</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // 手搓环形图（conic-gradient）
+  function donut(el, pass, fail, review){
+    const t=pass+fail+review; const a=pass/t*100, b=a+fail/t*100;
+    el.style.background='conic-gradient(var(--success) 0 '+a+'%, var(--error) '+a+'% '+b+'%, var(--warning) '+b+'% 100%)';
+  }
+  donut(document.getElementById('rptDonut'),18,1,1);
+  donut(document.getElementById('dashDonut'),234,41,25);
+
+  // tabs
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active'); document.getElementById('tab-'+t.dataset.tab).classList.add('active');
+  }));
+
+  // toast
+  function toast(m){const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1800);}
+
+  // 报告：打印 / 导出PDF / 复制要点
+  document.getElementById('btnPrint').onclick=()=>window.print();
+  document.getElementById('btnPdf').onclick=()=>{toast('在打印对话框选择「目标：另存为 PDF」即导出'); setTimeout(()=>window.print(),700);};
+  document.getElementById('btnCopy').onclick=()=>{
+    const txt=
+`形式审查意见书 — 申报包#12（第2轮 2026-06-26）
+结论：需整改
+概览：共20条，通过18 / 不通过1 / 待复核1（通过率90%）
+问题清单：
+ 1.[申请人资格] 负责人连续承担年限不满足（不通过）依据《申请规定》第十二条
+ 2.[预算] 劳务费占比偏高（待复核）
+复核人：dev`;
+    navigator.clipboard?.writeText(txt).then(()=>toast('要点已复制，可贴进 OA / 邮件')).catch(()=>toast('复制失败，请手动选取'));
+  };
+</script>
+</body>
+</html>

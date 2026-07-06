@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>项目批次重构 · 高保真原型</title>
+<style>
+  :root{
+    --primary:#1677ff; --primary-bg:#e6f0ff; --primary-bd:#91caff;
+    --green:#52c41a; --green-bg:#f6ffed; --green-bd:#b7eb8f;
+    --orange:#fa8c16; --orange-bg:#fff7e6; --orange-bd:#ffd591;
+    --red:#ff4d4f; --red-bg:#fff1f0; --red-bd:#ffccc7;
+    --gray:#8c8c8c; --gray-bg:#fafafa; --bd:#f0f0f0; --bd2:#e8e8e8;
+    --text:#1f1f1f; --text2:#595959; --text3:#8c8c8c;
+    --shadow:0 1px 4px rgba(0,0,0,.06); --shadow2:0 4px 16px rgba(0,0,0,.1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+    color:var(--text);background:#f0f2f5;font-size:14px;line-height:1.5;
+  }
+  /* ===== App shell ===== */
+  .shell{display:grid;grid-template-columns:220px 1fr 56px;height:100vh}
+  .menu{background:#fff;border-right:1px solid var(--bd);display:flex;flex-direction:column}
+  .brand{
+    padding:16px 20px;font-weight:700;font-size:15px;color:var(--primary);
+    border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;
+  }
+  .brand .fold{color:var(--text3);cursor:pointer;font-size:13px}
+  .menu-group{padding:8px 0}
+  .menu-group__title{padding:6px 20px;color:var(--text3);font-size:12px}
+  .menu-item{
+    display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;
+    color:var(--text2);border-radius:0;font-size:14px;position:relative;
+  }
+  .menu-item:hover{background:var(--gray-bg)}
+  .menu-item.active{background:var(--primary-bg);color:var(--primary);font-weight:600}
+  .menu-item.active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--primary)}
+  .menu-item .ic{width:16px;text-align:center;opacity:.85}
+
+  .main{overflow:auto;padding:20px 28px}
+  .chat-rail{
+    background:#fff;border-left:1px solid var(--bd);display:flex;flex-direction:column;
+    align-items:center;padding-top:14px;gap:8px;color:var(--text3);
+  }
+  .chat-rail .btn-ic{width:30px;height:30px;border:1px solid var(--bd2);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .chat-rail .vlabel{writing-mode:vertical-rl;letter-spacing:3px;font-size:13px;margin-top:6px}
+
+  /* ===== generic ===== */
+  .breadcrumb{font-size:13px;color:var(--text3);margin-bottom:14px}
+  .breadcrumb a{color:var(--text3);cursor:pointer;text-decoration:none}
+  .breadcrumb a:hover{color:var(--primary)}
+  .breadcrumb .sep{margin:0 8px;color:#d9d9d9}
+  .breadcrumb .cur{color:var(--text)}
+  .page-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .page-title{font-size:20px;font-weight:600}
+  .page-sub{color:var(--text3);font-size:13px;margin-top:2px}
+  .toolbar{display:flex;gap:10px;align-items:center}
+  .input{
+    border:1px solid var(--bd2);border-radius:6px;padding:6px 12px;font-size:13px;width:200px;
+    background:#fff;outline:none;
+  }
+  .input:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(22,119,255,.1)}
+  .select{border:1px solid var(--bd2);border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;cursor:pointer}
+  .btn{
+    border:1px solid var(--bd2);background:#fff;border-radius:6px;padding:6px 14px;font-size:14px;
+    cursor:pointer;color:var(--text2);transition:.15s;white-space:nowrap;
+  }
+  .btn:hover{color:var(--primary);border-color:var(--primary-bd)}
+  .btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn-primary:hover{background:#4096ff;border-color:#4096ff;color:#fff}
+  .btn-sm{padding:3px 10px;font-size:13px}
+  .btn-link{border:none;background:none;color:var(--primary);padding:3px 6px;cursor:pointer;font-size:13px}
+  .btn-link.danger{color:var(--red)}
+
+  .tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:1px 8px;border-radius:4px;
+    border:1px solid;line-height:18px;white-space:nowrap}
+  .tag-green{color:var(--green);background:var(--green-bg);border-color:var(--green-bd)}
+  .tag-blue{color:var(--primary);background:var(--primary-bg);border-color:var(--primary-bd)}
+  .tag-orange{color:var(--orange);background:var(--orange-bg);border-color:var(--orange-bd)}
+  .tag-red{color:var(--red);background:var(--red-bg);border-color:var(--red-bd)}
+  .tag-gray{color:var(--text2);background:var(--gray-bg);border-color:var(--bd2)}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+  .dot-green{background:var(--green)} .dot-blue{background:var(--primary)}
+  .dot-gray{background:#bfbfbf} .dot-red{background:var(--red)}
+
+  /* ===== cards grid ===== */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+  .card{
+    background:#fff;border:1px solid var(--bd);border-radius:10px;padding:0;overflow:hidden;
+    box-shadow:var(--shadow);transition:.18s;cursor:pointer;display:flex;flex-direction:column;
+  }
+  .card:hover{box-shadow:var(--shadow2);transform:translateY(-2px);border-color:var(--primary-bd)}
+  .card__body{padding:16px 18px;flex:1}
+  .card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px}
+  .card__title{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;line-height:1.4}
+  .card__title .ficon{font-size:18px}
+  .more{color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;line-height:1}
+  .card__meta{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+  .card__stat{display:flex;gap:18px;color:var(--text2);font-size:13px;margin:10px 0 4px}
+  .card__stat b{color:var(--text);font-size:15px;font-weight:600;margin-right:3px}
+  .card__foot{
+    border-top:1px solid var(--bd);padding:9px 18px;display:flex;gap:6px;align-items:center;
+    justify-content:flex-end;background:#fcfcfc;
+  }
+  .card__sub{color:var(--text3);font-size:12px;margin-top:6px}
+
+  /* ===== batch detail meta ===== */
+  .meta-card{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:18px 22px;
+    box-shadow:var(--shadow);margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+  .meta-left .mt{font-size:18px;font-weight:600;display:flex;align-items:center;gap:10px}
+  .meta-fields{display:flex;gap:28px;margin-top:12px;flex-wrap:wrap}
+  .meta-fields .f{font-size:13px;color:var(--text3)}
+  .meta-fields .f b{display:block;color:var(--text);font-size:14px;font-weight:600;margin-top:2px}
+
+  /* ===== tabs ===== */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--bd);margin-bottom:18px}
+  .tab{padding:9px 18px;cursor:pointer;color:var(--text2);font-size:14px;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab:hover{color:var(--primary)}
+  .tab.active{color:var(--primary);font-weight:600;border-bottom-color:var(--primary)}
+  .tab .cnt{color:var(--text3);font-weight:400;margin-left:4px}
+  .tabpane{display:none}
+  .tabpane.active{display:block}
+
+  /* ===== rule cards (审查规则美化) ===== */
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .chip{padding:4px 14px;border:1px solid var(--bd2);border-radius:16px;cursor:pointer;font-size:13px;
+    color:var(--text2);background:#fff;transition:.15s}
+  .chip:hover{border-color:var(--primary-bd);color:var(--primary)}
+  .chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
+  .chip .c{opacity:.7;margin-left:3px}
+  .chip.active .c{opacity:.85}
+
+  .dim-group{margin-bottom:22px}
+  .dim-group__h{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .dim-group__h .bar{width:3px;height:14px;border-radius:2px;background:var(--primary)}
+  .rule{
+    background:#fff;border:1px solid var(--bd);border-radius:10px;padding:14px 18px;margin-bottom:10px;
+    box-shadow:var(--shadow);transition:.15s;position:relative;
+  }
+  .rule:hover{border-color:var(--primary-bd);box-shadow:var(--shadow2)}
+  .rule:hover .rule__ops{opacity:1}
+  .rule__top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .rule__name{font-size:15px;font-weight:600}
+  .rule__badges{display:flex;gap:6px;flex-shrink:0}
+  .rule__logic{color:var(--text2);font-size:13.5px;margin-top:8px;line-height:1.6}
+  .rule__logic .lb{color:var(--text3)}
+  .rule__foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+  .rule__prov{color:var(--text3);font-size:12.5px;display:flex;align-items:center;gap:5px}
+  .rule__ops{opacity:0;transition:.15s;display:flex;gap:4px}
+
+  /* ===== material list ===== */
+  .mtable{background:#fff;border:1px solid var(--bd);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+  .mrow{display:grid;grid-template-columns:1.6fr .8fr .8fr .7fr 1fr;gap:10px;padding:13px 18px;
+    align-items:center;border-bottom:1px solid var(--bd)}
+  .mrow:last-child{border-bottom:none}
+  .mrow.head{background:var(--gray-bg);color:var(--text3);font-size:12.5px;font-weight:500}
+  .mrow .fn{font-weight:500;display:flex;align-items:center;gap:8px}
+
+  /* ===== modal ===== */
+  .mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;
+    justify-content:center;z-index:50;padding-top:90px}
+  .mask.show{display:flex}
+  .modal{background:#fff;border-radius:10px;width:460px;box-shadow:0 8px 40px rgba(0,0,0,.2);overflow:hidden}
+  .modal__h{padding:16px 22px;font-size:16px;font-weight:600;border-bottom:1px solid var(--bd)}
+  .modal__b{padding:20px 22px}
+  .modal__f{padding:12px 22px;border-top:1px solid var(--bd);display:flex;justify-content:flex-end;gap:10px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
+  .field label .req{color:var(--red);margin-right:3px}
+  .field .input{width:100%}
+  .checklist{max-height:220px;overflow:auto;border:1px solid var(--bd);border-radius:8px;padding:6px}
+  .citem{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer}
+  .citem:hover{background:var(--gray-bg)}
+  .citem .cb{width:16px;height:16px;border:1.5px solid var(--bd2);border-radius:4px;flex-shrink:0}
+  .citem.on .cb{background:var(--primary);border-color:var(--primary);position:relative}
+  .citem.on .cb::after{content:"✓";color:#fff;font-size:11px;position:absolute;left:2px;top:-2px}
+  .citem .ci-sub{color:var(--text3);font-size:12px;margin-left:auto}
+
+  .hint{background:#f0f7ff;border:1px solid var(--primary-bd);border-radius:8px;padding:10px 14px;
+    font-size:13px;color:var(--text2);margin-bottom:16px;display:flex;gap:8px}
+  .empty{text-align:center;color:var(--text3);padding:50px 0;font-size:14px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- ===== 左侧菜单 ===== -->
+  <aside class="menu">
+    <div class="brand"><span>立项审查AI辅助系统</span><span class="fold" title="折叠菜单">⟨⟨</span></div>
+    <div class="menu-group">
+      <div class="menu-group__title">概览</div>
+      <div class="menu-item"><span class="ic">🏠</span>工作台</div>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group__title">审查</div>
+      <div class="menu-item"><span class="ic">📝</span>新建审查</div>
+      <div class="menu-item"><span class="ic">📋</span>审查任务</div>
+      <div class="menu-item"><span class="ic">📊</span>审查报告</div>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group__title">资源</div>
+      <div class="menu-item active" onclick="go('batch-list')"><span class="ic">🗂️</span>项目批次</div>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group__title">系统</div>
+      <div class="menu-item"><span class="ic">ℹ️</span>关于流程</div>
+    </div>
+  </aside>
+
+  <!-- ===== 主区 ===== -->
+  <main class="main">
+
+    <!-- 页1：批次列表 -->
+    <section id="batch-list" class="view">
+      <div class="page-head">
+        <div>
+          <div class="page-title">项目批次</div>
+          <div class="page-sub">按批次组织规则集与申报材料，点击批次进入</div>
+        </div>
+        <div class="toolbar">
+          <input class="input" placeholder="搜索批次号 / 申报期" />
+          <select class="select"><option>全部状态</option><option>审查中</option><option>已归档</option></select>
+          <button class="btn btn-primary" onclick="openModal('m-batch')">＋ 新建批次</button>
+        </div>
+      </div>
+      <div class="grid">
+        <!-- 批次卡片 -->
+        <div class="card" onclick="go('batch-detail')">
+          <div class="card__body">
+            <div class="card__head">
+              <div class="card__title"><span class="ficon">🗂️</span>2026 年度国家重点研发计划</div>
+              <span class="tag tag-green"><span class="dot dot-green"></span>审查中</span>
+            </div>
+            <div class="card__meta">
+              <span class="tag tag-gray">重点专项</span>
+              <span class="tag tag-gray">形式审查</span>
+            </div>
+            <div class="card__stat">
+              <span><b>12</b>份材料</span><span><b>3</b>份规则文件</span><span><b>28</b>条规则</span>
+            </div>
+            <div class="card__sub">批次号 BATCH-2026-001 · 申报期 2026.03–2026.05</div>
+          </div>
+          <div class="card__foot">
+            <button class="btn btn-sm">绑定规则集</button>
+            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();go('batch-detail')">进入批次 →</button>
+          </div>
+        </div>
+
+        <div class="card" onclick="go('batch-detail')">
+          <div class="card__body">
+            <div class="card__head">
+              <div class="card__title"><span class="ficon">🗂️</span>2026 自然科学基金面上项目</div>
+              <span class="tag tag-green"><span class="dot dot-green"></span>审查中</span>
+            </div>
+            <div class="card__meta">
+              <span class="tag tag-gray">面上项目</span>
+              <span class="tag tag-gray">形式审查</span>
+            </div>
+            <div class="card__stat">
+              <span><b>34</b>份材料</span><span><b>2</b>份规则文件</span><span><b>16</b>条规则</span>
+            </div>
+            <div class="card__sub">批次号 BATCH-2026-002 · 申报期 2026.01–2026.03</div>
+          </div>
+          <div class="card__foot">
+            <button class="btn btn-sm">绑定规则集</button>
+            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();go('batch-detail')">进入批次 →</button>
+          </div>
+        </div>
+
+        <div class="card" onclick="go('batch-detail')">
+          <div class="card__body">
+            <div class="card__head">
+              <div class="card__title"><span class="ficon">🗂️</span>未归类（默认批次）</div>
+              <span class="tag tag-gray"><span class="dot dot-gray"></span>默认</span>
+            </div>
+            <div class="card__meta">
+              <span class="tag tag-gray">占位类型</span>
+              <span class="tag tag-gray">形式审查</span>
+            </div>
+            <div class="card__stat">
+              <span><b>5</b>份材料</span><span><b>1</b>份规则文件</span><span><b>10</b>条规则</span>
+            </div>
+            <div class="card__sub">系统默认批次 · 历史遗留材料归此</div>
+          </div>
+          <div class="card__foot">
+            <button class="btn btn-sm">绑定规则集</button>
+            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();go('batch-detail')">进入批次 →</button>
+          </div>
+        </div>
+
+        <!-- 新建批次占位卡 -->
+        <div class="card" style="border-style:dashed;box-shadow:none;align-items:center;justify-content:center;min-height:188px"
+             onclick="openModal('m-batch')">
+          <div style="text-align:center;color:var(--text3)">
+            <div style="font-size:30px;line-height:1">＋</div>
+            <div style="margin-top:6px">新建批次</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 页2：批次详情 -->
+    <section id="batch-detail" class="view" style="display:none">
+      <div class="breadcrumb">
+        <a onclick="go('batch-list')">项目批次</a><span class="sep">/</span>
+        <span class="cur">2026 年度国家重点研发计划</span>
+      </div>
+      <div class="meta-card">
+        <div class="meta-left">
+          <div class="mt">🗂️ 2026 年度国家重点研发计划
+            <span class="tag tag-green"><span class="dot dot-green"></span>审查中</span></div>
+          <div class="meta-fields">
+            <div class="f">批次号<b>BATCH-2026-001</b></div>
+            <div class="f">项目类型<b>重点专项</b></div>
+            <div class="f">审查阶段<b>形式审查</b></div>
+            <div class="f">申报期<b>2026.03 – 2026.05</b></div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button class="btn" onclick="openModal('m-bind')">绑定规则集</button>
+          <button class="btn">编辑批次</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" onclick="tab(this,'tp-rules')">规则库<span class="cnt">3</span></div>
+        <div class="tab" onclick="tab(this,'tp-config')">配置包<span class="cnt">3</span></div>
+        <div class="tab" onclick="tab(this,'tp-mat')">审查文档库<span class="cnt">12</span></div>
+      </div>
+
+      <!-- Tab 规则库：规则文件卡片 -->
+      <div id="tp-rules" class="tabpane active">
+        <div class="grid">
+          <div class="card" onclick="go('rule-detail')">
+            <div class="card__body">
+              <div class="card__head">
+                <div class="card__title"><span class="ficon">📘</span>国家重点研发计划申报指南</div>
+                <span class="more" onclick="event.stopPropagation()">⋮</span>
+              </div>
+              <div class="card__meta"><span class="tag tag-green"><span class="dot dot-green"></span>已识别</span></div>
+              <div class="card__stat"><span><b>15</b>段</span><span><b>8</b>条款</span><span><b>10</b>规则</span></div>
+              <div class="card__sub">2.3 MB · 2026-06-24 上传</div>
+            </div>
+            <div class="card__foot">
+              <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();go('rule-detail')">查看规则</button>
+              <button class="btn btn-sm" onclick="event.stopPropagation()">原文</button>
+              <button class="btn btn-sm" onclick="event.stopPropagation()">重新识别</button>
+            </div>
+          </div>
+
+          <div class="card" onclick="go('rule-detail')">
+            <div class="card__body">
+              <div class="card__head">
+                <div class="card__title"><span class="ficon">📕</span>经费预算编制规定</div>
+                <span class="more" onclick="event.stopPropagation()">⋮</span>
+              </div>
+              <div class="card__meta"><span class="tag tag-green"><span class="dot dot-green"></span>已识别</span></div>
+              <div class="card__stat"><span><b>8</b>段</span><span><b>5</b>条款</span><span><b>6</b>规则</span></div>
+              <div class="card__sub">1.1 MB · 2026-06-22 上传</div>
+            </div>
+            <div class="card__foot">
+              <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();go('rule-detail')">查看规则</button>
+              <button class="btn btn-sm" onclick="event.stopPropagation()">原文</button>
+              <button class="btn btn-sm" onclick="event.stopPropagation()">重新识别</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__body">
+              <div class="card__head">
+                <div class="card__title"><span class="ficon">📗</span>诚信与回避管理办法</div>
+                <span class="more" onclick="event.stopPropagation()">⋮</span>
+              </div>
+              <div class="card__meta"><span class="tag tag-blue"><span class="dot dot-blue" style="animation:none"></span>识别中…</span></div>
+              <div class="card__stat" style="opacity:.5"><span><b>—</b>段</span><span><b>—</b>条款</span><span><b>—</b>规则</span></div>
+              <div class="card__sub">0.6 MB · 2026-06-26 上传</div>
+            </div>
+            <div class="card__foot">
+              <button class="btn btn-sm" disabled style="opacity:.5">查看规则</button>
+              <button class="btn btn-sm">原文</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 配置包 -->
+      <div id="tp-config" class="tabpane">
+        <div class="hint">ℹ️ 配置包是从本批次绑定的规则文件自动派生的<b style="margin:0 3px">只读规则集</b>，用于审查执行时下发。</div>
+        <div class="mtable">
+          <div class="mrow head"><span>配置包（=规则文件）</span><span>版本</span><span>规则数</span><span>维度</span><span>操作</span></div>
+          <div class="mrow"><span class="fn">📘 国家重点研发计划申报指南</span><span>V1.0</span><span>10</span>
+            <span><span class="tag tag-gray">完整性</span></span><span><button class="btn-link">查看</button></span></div>
+          <div class="mrow"><span class="fn">📕 经费预算编制规定</span><span>V1.0</span><span>6</span>
+            <span><span class="tag tag-gray">规范性</span></span><span><button class="btn-link">查看</button></span></div>
+          <div class="mrow"><span class="fn">📗 诚信与回避管理办法</span><span>—</span><span>—</span>
+            <span><span class="tag tag-blue">抽取中</span></span><span><button class="btn-link" style="opacity:.5">查看</button></span></div>
+        </div>
+      </div>
+
+      <!-- Tab 审查文档库 -->
+      <div id="tp-mat" class="tabpane">
+        <div class="mtable">
+          <div class="mrow head"><span>申报材料</span><span>类别</span><span>识别状态</span><span>段落</span><span>操作</span></div>
+          <div class="mrow"><span class="fn">📄 张伟-申请书.pdf</span><span>申请书</span>
+            <span><span class="tag tag-green">已识别</span></span><span>23</span>
+            <span><button class="btn-link">查看原文件</button></span></div>
+          <div class="mrow"><span class="fn">📄 预算明细表.xlsx</span><span>预算表</span>
+            <span><span class="tag tag-green">已识别</span></span><span>11</span>
+            <span><button class="btn-link">查看原文件</button></span></div>
+          <div class="mrow"><span class="fn">📄 个人简历-李娜.docx</span><span>个人简历</span>
+            <span><span class="tag tag-orange">识别中</span></span><span>—</span>
+            <span><button class="btn-link">查看原文件</button></span></div>
+          <div class="mrow"><span class="fn">📄 合作单位证明.pdf</span><span>附件</span>
+            <span><span class="tag tag-green">已识别</span></span><span>4</span>
+            <span><button class="btn-link">查看原文件</button></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 页3：规则详情（审查规则美化） -->
+    <section id="rule-detail" class="view" style="display:none">
+      <div class="breadcrumb">
+        <a onclick="go('batch-list')">项目批次</a><span class="sep">/</span>
+        <a onclick="go('batch-detail')">2026 年度国家重点研发计划</a><span class="sep">/</span>
+        <a onclick="go('batch-detail')">规则库</a><span class="sep">/</span>
+        <span class="cur">国家重点研发计划申报指南</span>
+      </div>
+      <div class="page-head">
+        <div>
+          <div class="page-title">📘 国家重点研发计划申报指南</div>
+          <div class="page-sub">已识别 15 段 · 8 条款 · 10 规则　|　2.3 MB · 2026-06-24</div>
+        </div>
+        <div class="toolbar">
+          <button class="btn">查看原文件</button>
+          <button class="btn">重新识别并重抽规则</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" onclick="tab(this,'tp-rule')">审查规则<span class="cnt">10</span></div>
+        <div class="tab" onclick="tab(this,'tp-clause')">依据条款<span class="cnt">8</span></div>
+      </div>
+
+      <div id="tp-rule" class="tabpane active">
+        <div class="chips">
+          <span class="chip active">全部<span class="c">10</span></span>
+          <span class="chip">完整性<span class="c">3</span></span>
+          <span class="chip">规范性<span class="c">2</span></span>
+          <span class="chip">合规性<span class="c">4</span></span>
+          <span class="chip">一致性<span class="c">1</span></span>
+          <span class="chip">合理性<span class="c">0</span></span>
+          <span class="chip">真实性<span class="c">0</span></span>
+        </div>
+
+        <div class="dim-group">
+          <div class="dim-group__h"><span class="bar"></span>完整性 <span style="color:var(--text3);font-weight:400">(3)</span></div>
+
+          <div class="rule">
+            <div class="rule__top">
+              <div class="rule__name">申请书须包含完整的预算编制说明</div>
+              <div class="rule__badges">
+                <span class="tag tag-red">硬性</span><span class="tag tag-gray">驳回</span>
+              </div>
+            </div>
+            <div class="rule__logic"><span class="lb">判定逻辑：</span>若申请书缺少「预算编制说明」章节，或该章节字数少于 200 字，则判定不通过。</div>
+            <div class="rule__foot">
+              <div class="rule__prov">📍 出处：第 3 页第 2 段</div>
+              <div class="rule__ops"><button class="btn-link">编辑</button><button class="btn-link danger">删除</button></div>
+            </div>
+          </div>
+
+          <div class="rule">
+            <div class="rule__top">
+              <div class="rule__name">必须提供依托单位公函</div>
+              <div class="rule__badges">
+                <span class="tag tag-red">硬性</span><span class="tag tag-gray">补正</span>
+              </div>
+            </div>
+            <div class="rule__logic"><span class="lb">判定逻辑：</span>附件清单中须含「依托单位推荐公函」，缺失则要求补正。</div>
+            <div class="rule__foot">
+              <div class="rule__prov">📍 出处：第 5 页第 1 段</div>
+              <div class="rule__ops"><button class="btn-link">编辑</button><button class="btn-link danger">删除</button></div>
+            </div>
+          </div>
+
+          <div class="rule">
+            <div class="rule__top">
+              <div class="rule__name">研究方案应包含技术路线图</div>
+              <div class="rule__badges">
+                <span class="tag tag-orange">需核验</span><span class="tag tag-gray">复核</span>
+              </div>
+            </div>
+            <div class="rule__logic"><span class="lb">判定逻辑：</span>研究方案需含技术路线图示，未检出图示时转人工复核。</div>
+            <div class="rule__foot">
+              <div class="rule__prov">📍 出处：第 4 页第 3 段</div>
+              <div class="rule__ops"><button class="btn-link">编辑</button><button class="btn-link danger">删除</button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dim-group">
+          <div class="dim-group__h"><span class="bar" style="background:var(--orange)"></span>规范性 <span style="color:var(--text3);font-weight:400">(2)</span></div>
+
+          <div class="rule">
+            <div class="rule__top">
+              <div class="rule__name">经费预算总额不得超过指南限额</div>
+              <div class="rule__badges">
+                <span class="tag tag-red">硬性</span><span class="tag tag-gray">驳回</span>
+              </div>
+            </div>
+            <div class="rule__logic"><span class="lb">判定逻辑：</span>申报经费总额 ≤ 该专项指南规定的单项目限额（如 500 万元）。</div>
+            <div class="rule__foot">
+              <div class="rule__prov">📍 出处：第 6 页第 2 段</div>
+              <div class="rule__ops"><button class="btn-link">编辑</button><button class="btn-link danger">删除</button></div>
+            </div>
+          </div>
+
+          <div class="rule">
+            <div class="rule__top">
+              <div class="rule__name">申请书格式须符合规定模板</div>
+              <div class="rule__badges">
+                <span class="tag tag-blue">建议</span><span class="tag tag-gray">复核</span>
+              </div>
+            </div>
+            <div class="rule__logic"><span class="lb">判定逻辑：</span>申请书应使用官方模板，字体/页边距偏离时给出建议性提示。</div>
+            <div class="rule__foot">
+              <div class="rule__prov">📍 出处：第 1 页第 4 段</div>
+              <div class="rule__ops"><button class="btn-link">编辑</button><button class="btn-link danger">删除</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tp-clause" class="tabpane">
+        <div class="rule">
+          <div class="rule__top"><div class="rule__name">第三条　申报材料完整性要求</div></div>
+          <div class="rule__logic">申请人须按本指南要求提交申请书、预算明细、个人简历及相关附件，材料不全的不予受理。</div>
+          <div class="rule__foot"><div class="rule__prov">📍 出处：第 3 页第 2 段</div>
+            <div class="rule__ops"><button class="btn-link">编辑</button><button class="btn-link danger">删除</button></div></div>
+        </div>
+        <div class="rule">
+          <div class="rule__top"><div class="rule__name">第六条　经费预算编制</div></div>
+          <div class="rule__logic">经费预算应按科目据实编制，总额不得突破指南规定的资助强度上限。</div>
+          <div class="rule__foot"><div class="rule__prov">📍 出处：第 6 页第 2 段</div>
+            <div class="rule__ops"><button class="btn-link">编辑</button><button class="btn-link danger">删除</button></div></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== 右侧聊天栏（折叠态示意） ===== -->
+  <aside class="chat-rail">
+    <div class="btn-ic" title="展开对话">⟩⟩</div>
+    <div class="vlabel">AI 对话</div>
+  </aside>
+</div>
+
+<!-- ===== 新建批次 Modal ===== -->
+<div class="mask" id="m-batch">
+  <div class="modal">
+    <div class="modal__h">新建批次</div>
+    <div class="modal__b">
+      <div class="field"><label><span class="req">*</span>批次号</label>
+        <input class="input" placeholder="如 BATCH-2026-003" /></div>
+      <div class="field"><label>申报期</label>
+        <input class="input" placeholder="如 2026.06 – 2026.08" /></div>
+      <div class="hint" style="margin:0">ℹ️ 项目类型 / 审查阶段暂用系统默认占位值，后续可在批次内调整。</div>
+    </div>
+    <div class="modal__f">
+      <button class="btn" onclick="closeModal('m-batch')">取消</button>
+      <button class="btn btn-primary" onclick="closeModal('m-batch')">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 绑定规则集 Modal ===== -->
+<div class="mask" id="m-bind">
+  <div class="modal">
+    <div class="modal__h">绑定规则集 · 从规则文件中勾选</div>
+    <div class="modal__b">
+      <div class="hint" style="margin-bottom:14px">ℹ️ 一个批次可绑定多份规则文件，批次「规则库」= 所选文件规则的并集。</div>
+      <div class="checklist">
+        <div class="citem on"><span class="cb"></span>📘 国家重点研发计划申报指南<span class="ci-sub">10 规则</span></div>
+        <div class="citem on"><span class="cb"></span>📕 经费预算编制规定<span class="ci-sub">6 规则</span></div>
+        <div class="citem on"><span class="cb"></span>📗 诚信与回避管理办法<span class="ci-sub">抽取中</span></div>
+        <div class="citem"><span class="cb"></span>📙 涉密项目审查细则<span class="ci-sub">12 规则</span></div>
+        <div class="citem"><span class="cb"></span>📄 科研伦理审查规范<span class="ci-sub">7 规则</span></div>
+      </div>
+    </div>
+    <div class="modal__f">
+      <button class="btn" onclick="closeModal('m-bind')">取消</button>
+      <button class="btn btn-primary" onclick="closeModal('m-bind')">保存绑定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function go(id){
+    document.querySelectorAll('.view').forEach(v=>v.style.display='none');
+    document.getElementById(id).style.display='block';
+    document.querySelector('.main').scrollTop=0;
+  }
+  function tab(el,pane){
+    const tabs=el.parentElement;
+    tabs.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+    const sec=el.closest('.view');
+    sec.querySelectorAll('.tabpane').forEach(p=>p.classList.remove('active'));
+    sec.querySelector('#'+pane).classList.add('active');
+  }
+  function openModal(id){document.getElementById(id).classList.add('show')}
+  function closeModal(id){document.getElementById(id).classList.remove('show')}
+  document.querySelectorAll('.mask').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show')}));
+  // 勾选交互
+  document.querySelectorAll('.citem').forEach(c=>c.addEventListener('click',()=>c.classList.toggle('on')));
+  document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+    c.parentElement.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');
+  }));
+</script>
+</body>
+</html>

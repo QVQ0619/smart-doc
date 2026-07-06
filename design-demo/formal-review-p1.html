@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>形式审查结果 · P1 设计演示</title>
+<style>
+  :root{
+    --success:#52c41a; --success-bg:#f6ffed; --success-bd:#b7eb8f;
+    --warning:#faad14; --warning-bg:#fffbe6; --warning-bd:#ffe58f;
+    --error:#ff4d4f;   --error-bg:#fff1f0;   --error-bd:#ffccc7;
+    --neutral:#8c8c8c; --neutral-bg:#fafafa;
+    --ink:#1d2129; --sub:#86909c; --line:#e5e6eb; --primary:#2f6bff; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:#f5f6f8; color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.6;}
+  .wrap{max-width:1080px; margin:0 auto; padding:28px 24px 64px;}
+  .demo-flag{font-size:12px; color:var(--sub); margin-bottom:14px;}
+  .demo-flag b{color:var(--primary);}
+  .ph h1{margin:0; font-size:20px; font-weight:600;}
+  .ph p{margin:4px 0 0; color:var(--sub); font-size:13px;}
+  .card{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:24px; margin-top:16px;}
+
+  .pkgbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;}
+  .pkgsel{display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:15px;
+    padding:6px 12px; border:1px solid var(--line); border-radius:8px; cursor:pointer;}
+  .pkgsel .caret{color:var(--sub); font-size:12px;}
+  .progress-mini{color:var(--sub); font-size:13px; display:flex; align-items:center; gap:10px;}
+  .pbar{width:140px; height:6px; border-radius:999px; background:#eef0f3; overflow:hidden;}
+  .pbar > i{display:block; height:100%; background:var(--primary); border-radius:999px; transition:.3s;}
+
+  .verdict{position:relative; border-radius:var(--radius); padding:18px 22px 18px 26px; overflow:hidden;
+    border:1px solid var(--error-bd); background:var(--error-bg);}
+  .verdict::before{content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--error);}
+  .verdict .top{display:flex; align-items:flex-start; justify-content:space-between; gap:16px;}
+  .verdict .concl{display:flex; align-items:center; gap:12px;}
+  .verdict .vicon{width:40px; height:40px; border-radius:50%; flex:0 0 40px; display:grid; place-items:center;
+    background:var(--error); color:#fff; font-size:22px; font-weight:700;}
+  .verdict .ctxt h2{margin:0; font-size:22px; font-weight:700; color:var(--error);}
+  .verdict .ctxt .sub{color:#7a4a4a; font-size:13px; margin-top:2px;}
+  .verdict .meta{color:var(--sub); font-size:12px; text-align:right; white-space:nowrap;}
+  .verdict hr{border:none; border-top:1px solid var(--error-bd); margin:14px 0; opacity:.7;}
+  .verdict .summ{display:flex; align-items:center; gap:20px; flex-wrap:wrap; font-size:13px;}
+  .verdict .summ .total{color:var(--sub);}
+  .dot{display:inline-flex; align-items:center; gap:6px;}
+  .dot i{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  .verdict .vprog{display:flex; align-items:center; gap:10px; margin-top:12px; color:var(--sub); font-size:12px;}
+  .verdict .vprog .pbar{width:200px;}
+
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:18px;}
+  .stat{border:1px solid var(--line); border-radius:10px; padding:14px 16px; cursor:pointer; transition:.15s; user-select:none;}
+  .stat:hover{border-color:#c9ced6; box-shadow:0 2px 10px rgba(0,0,0,.04);}
+  .stat.active{border-color:var(--primary); box-shadow:0 0 0 2px rgba(47,107,255,.12);}
+  .stat .lab{display:flex; align-items:center; gap:7px; color:var(--sub); font-size:13px;}
+  .stat .num{font-size:28px; font-weight:700; margin-top:4px; line-height:1.1;}
+  .badge{width:18px; height:18px; border-radius:50%; display:inline-grid; place-items:center; font-size:11px; color:#fff; font-weight:700;}
+  .b-pass{background:var(--success);} .b-fail{background:var(--error);} .b-review{background:var(--warning);} .b-na{background:var(--neutral);}
+  .stat.s-pass .num{color:var(--success);} .stat.s-fail .num{color:var(--error);} .stat.s-review .num{color:var(--warning);} .stat.s-na .num{color:#bbb;}
+
+  .group{border:1px solid var(--line); border-radius:10px; margin-top:14px; overflow:hidden;}
+  .group.allpass{background:var(--neutral-bg);}
+  .ghead{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; background:#fff;}
+  .group.allpass .ghead{background:var(--neutral-bg);}
+  .ghead .gleft{display:flex; align-items:center; gap:10px;}
+  .ghead .gcaret{color:var(--sub); font-size:12px; transition:.15s; width:12px; display:inline-block;}
+  .group.collapsed .gcaret{transform:rotate(-90deg);}
+  .ghead .gname{font-weight:600; font-size:15px;}
+  .ghead .gcount .pill{display:inline-block; padding:1px 8px; border-radius:999px; margin-left:6px; font-weight:600; font-size:12px;}
+  .pill.fail{background:var(--error-bg); color:var(--error);}
+  .pill.review{background:var(--warning-bg); color:#ad6800;}
+  .pill.ok{background:var(--success-bg); color:#389e0d;}
+  .gbtn{font-size:12px; color:var(--primary); background:none; border:1px solid #cdd9ff; border-radius:6px; padding:3px 10px; cursor:pointer;}
+  .gbtn:hover{background:#f0f5ff;}
+  .gbody{padding:4px 12px 12px;}
+  .group.collapsed .gbody{display:none;}
+
+  /* ===== P1 发现卡片 ===== */
+  .find{position:relative; border:1px solid var(--line); border-radius:8px; padding:13px 15px 13px 17px; margin-top:8px; background:#fff;}
+  .find::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px; border-radius:8px 0 0 8px;}
+  .find.r-fail::before{background:var(--error);} .find.r-fail{background:var(--error-bg);}
+  .find.r-review::before{background:var(--warning);} .find.r-review{background:var(--warning-bg);}
+  .find.r-pass::before{background:var(--success);}
+  .find.r-over::before{background:var(--success);} .find.r-over{background:var(--success-bg);}
+  .find.done{opacity:.6;}
+  .find .l1{display:flex; align-items:center; justify-content:space-between; gap:12px;}
+  .find .title{display:flex; align-items:center; gap:9px; min-width:0;}
+  .sicon{width:20px; height:20px; border-radius:50%; flex:0 0 20px; display:grid; place-items:center; color:#fff; font-size:12px; font-weight:700;}
+  .si-fail{background:var(--error);} .si-review{background:var(--warning);} .si-pass{background:var(--success);}
+  .find .tname{font-weight:600; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .find.r-pass .tname{font-weight:500; color:#4e5969;}
+  /* 机审判定胶囊 + 置信度 */
+  .vpill{display:inline-flex; align-items:center; gap:8px; font-size:12px; padding:3px 10px; border-radius:999px; white-space:nowrap; flex:0 0 auto;}
+  .vpill.fail{background:#fff; border:1px solid var(--error-bd); color:var(--error);}
+  .vpill.review{background:#fff; border:1px solid var(--warning-bd); color:#ad6800;}
+  .vpill.pass{background:#fff; border:1px solid var(--success-bd); color:#389e0d;}
+  .vpill .conf{color:var(--sub); border-left:1px solid currentColor; padding-left:8px; opacity:.85;}
+  .lowconf{color:#ad6800; background:var(--warning-bg); border:1px solid var(--warning-bd); border-radius:999px;
+    font-size:11px; padding:1px 7px; margin-left:6px; white-space:nowrap;}
+  /* 改判后的箭头链 */
+  .overchain{display:inline-flex; align-items:center; gap:7px; font-size:13px; color:#389e0d; font-weight:600;}
+  .overchain .mach{color:var(--sub); text-decoration:line-through; font-weight:400;}
+  .overchain .arrow{color:var(--sub);}
+  .find .meta2{font-size:12px; color:var(--sub); margin-top:5px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+  .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  .sev{display:inline-flex; align-items:center; gap:4px;}
+  .sev.high{color:var(--error);} .sev.mid{color:#ad6800;} .sev.low{color:var(--sub);}
+  .find .sugg{font-size:14px; color:#4e5969; margin-top:7px;}
+  .find .human{font-size:13px; color:#389e0d; margin-top:6px; background:#fff; border:1px solid var(--success-bd);
+    border-radius:6px; padding:6px 10px;}
+  .find .human .who{color:var(--sub); font-size:12px; margin-left:6px;}
+  .find .l3{display:flex; align-items:center; justify-content:space-between; margin-top:11px; gap:10px;}
+  .ev{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#4e5969; cursor:pointer;
+    border:1px dashed #d4d8de; border-radius:6px; padding:3px 10px; background:#fafbfc;}
+  .ev:hover{border-color:var(--primary); color:var(--primary); background:#f0f5ff;}
+  .acts{display:flex; gap:8px;}
+  .btn{font-size:13px; border-radius:6px; padding:4px 14px; cursor:pointer; border:1px solid var(--line); background:#fff;}
+  .btn.confirm{border-color:#cdd9ff; color:var(--primary);} .btn.confirm:hover{background:#f0f5ff;}
+  .btn.over{border-color:var(--warning-bd); color:#ad6800;} .btn.over:hover{background:var(--warning-bg);}
+  .btn.link{border:none; color:var(--sub); background:none;}
+  .find .donetag{font-size:12px; color:var(--success); display:none; align-items:center; gap:5px;}
+  .find.done .acts{display:none;} .find.done .donetag{display:inline-flex;}
+
+  /* ===== 右侧抽屉 ===== */
+  .mask{position:fixed; inset:0; background:rgba(0,0,0,.35); opacity:0; pointer-events:none; transition:.2s; z-index:50;}
+  .mask.open{opacity:1; pointer-events:auto;}
+  .drawer{position:fixed; top:0; right:0; bottom:0; width:440px; max-width:92vw; background:#fff; z-index:51;
+    transform:translateX(100%); transition:transform .25s ease; display:flex; flex-direction:column; box-shadow:-8px 0 28px rgba(0,0,0,.12);}
+  .drawer.open{transform:translateX(0);}
+  .dwh{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line);}
+  .dwh h3{margin:0; font-size:16px; font-weight:600;}
+  .dwh .x{cursor:pointer; color:var(--sub); font-size:20px; line-height:1; border:none; background:none;}
+  .dwb{padding:20px; overflow:auto; flex:1;}
+  .dwf{padding:14px 20px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:10px;}
+  .kv{font-size:13px; color:var(--sub); margin-bottom:4px;}
+  .kv b{color:var(--ink); font-weight:600;}
+  .srcbox{background:var(--neutral-bg); border:1px solid var(--line); border-radius:8px; padding:14px; margin-top:10px;
+    font-size:14px; line-height:1.9; color:#2b2f36;}
+  .hl{background:#fff1b8; border-radius:3px; padding:0 2px; box-shadow:inset 0 -2px 0 #ffe58f;}
+  .dwsec{margin-top:18px;} .dwsec .t{font-size:12px; color:var(--sub); margin-bottom:6px;}
+  .radio-row{display:flex; gap:10px; margin-top:6px;}
+  .radio{flex:1; text-align:center; border:1px solid var(--line); border-radius:8px; padding:9px 0; cursor:pointer; font-size:14px;}
+  .radio.sel{border-color:var(--primary); color:var(--primary); background:#f0f5ff; font-weight:600;}
+  textarea{width:100%; border:1px solid var(--line); border-radius:8px; padding:9px 11px; font-size:14px; resize:vertical;
+    font-family:inherit; margin-top:6px;}
+  textarea:focus{outline:none; border-color:var(--primary);}
+  .req{color:var(--error);}
+  .btn.primary{background:var(--primary); color:#fff; border-color:var(--primary);}
+  .btn.primary:hover{filter:brightness(1.05);}
+  .clausebox{background:#f0f5ff; border:1px solid #cdd9ff; border-radius:8px; padding:10px 12px; font-size:13px; color:#314158; margin-top:6px;}
+
+  .toast{position:fixed; left:50%; bottom:30px; transform:translateX(-50%); background:#1d2129; color:#fff;
+    padding:8px 16px; border-radius:8px; font-size:13px; opacity:0; transition:.25s; pointer-events:none; z-index:60;}
+  .toast.show{opacity:.95;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="demo-flag">⚙ <b>P1 设计演示页</b>（独立 HTML，不接后端、不改项目代码）。新增：发现卡片含<b>置信度/严重度/改判态</b> · 点<b>出处</b>看原文高亮 · 点<b>改判</b>开上下文表单抽屉。</div>
+
+  <div class="ph"><h1>形式审查</h1><p>按 hard 规则逐条核对申报包，机审结论与人工复核</p></div>
+
+  <div class="card">
+    <div class="pkgbar">
+      <div class="pkgsel">审查包 #12 · 国家自然科学基金面上项目 <span class="caret">▾</span></div>
+      <div class="progress-mini"><span id="progText">复核进度 5/20</span><span class="pbar"><i id="progBar" style="width:25%"></i></span></div>
+    </div>
+
+    <div class="verdict">
+      <div class="top">
+        <div class="concl"><div class="vicon">!</div>
+          <div class="ctxt"><h2>建议不予立项</h2><div class="sub">申报包 #12 · 国家自然科学基金面上项目</div></div></div>
+        <div class="meta">第 1 轮审查<br/>2026-06-26 14:30</div>
+      </div>
+      <hr/>
+      <div class="summ"><span class="total">共 20 条规则</span>
+        <span class="dot"><i style="background:var(--success)"></i>15 通过</span>
+        <span class="dot"><i style="background:var(--error)"></i>3 不通过</span>
+        <span class="dot"><i style="background:var(--warning)"></i>2 待复核</span>
+        <span class="dot"><i style="background:var(--neutral)"></i>0 不适用</span></div>
+      <div class="vprog"><span class="pbar"><i id="progBar2" style="width:25%"></i></span><span id="progText2">复核进度 5/20</span></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat s-pass" data-filter="pass"><div class="lab"><span class="badge b-pass">✓</span>通过</div><div class="num">15</div></div>
+      <div class="stat s-fail" data-filter="fail"><div class="lab"><span class="badge b-fail">✕</span>不通过</div><div class="num">3</div></div>
+      <div class="stat s-review" data-filter="review"><div class="lab"><span class="badge b-review">!</span>待复核</div><div class="num">2</div></div>
+      <div class="stat s-na" data-filter="na"><div class="lab"><span class="badge b-na">⊘</span>不适用</div><div class="num">0</div></div>
+    </div>
+
+    <div id="groups">
+      <!-- 申请人资格 -->
+      <div class="group" data-dim>
+        <div class="ghead"><div class="gleft"><span class="gcaret">▾</span><span class="gname">申请人资格</span>
+          <span class="gcount"><span class="pill fail">1 不通过</span><span class="pill review">1 待复核</span></span></div>
+          <button class="gbtn">✓ 确认本组通过项</button></div>
+        <div class="gbody">
+          <div class="find r-fail" data-result="fail">
+            <div class="l1"><div class="title"><span class="sicon si-fail">✕</span><span class="tname">负责人连续承担年限不满足</span></div>
+              <span class="vpill fail">机审 ✕ 不通过 <span class="conf">置信度 78%</span></span></div>
+            <div class="meta2"><span class="code">SD-RULE-014</span><span class="sev high">● 严重度 高</span></div>
+            <div class="sugg">负责人须满足近 3 年连续承担经历；材料显示 2022 年中断 1 年。</div>
+            <div class="l3">
+              <span class="ev" data-ev="ev1">📎 申请书·正文 第3段 ↗</span>
+              <div class="acts"><button class="btn confirm" data-confirm>确认</button><button class="btn over" data-over="负责人连续承担年限不满足|✕ 不通过|78%|《国家自然科学基金申请规定》第十二条：项目负责人应当具有承担基础研究课题的经历，近三年须连续承担相关任务。">改判</button></div>
+              <span class="donetag">✓ 已复核</span></div>
+          </div>
+          <div class="find r-review" data-result="review">
+            <div class="l1"><div class="title"><span class="sicon si-review">!</span><span class="tname">负责人在研项目数接近上限</span></div>
+              <span class="vpill review">机审 ! 待复核 <span class="conf">置信度 52%</span><span class="lowconf">⚠ 建议人工</span></span></div>
+            <div class="meta2"><span class="code">SD-RULE-017</span><span class="sev mid">● 严重度 中</span></div>
+            <div class="sugg">在研项目 2 项，接近同类限项 2 项上限；机审无法判断是否计入历史项目，请人工确认。</div>
+            <div class="l3">
+              <span class="ev" data-ev="ev2">📎 字段：在研项目数 ↗</span>
+              <div class="acts"><button class="btn confirm" data-confirm>确认</button><button class="btn over" data-over="负责人在研项目数接近上限|! 待复核|52%|《国家自然科学基金申请规定》第九条：申请及在研项目总数限为 2 项。">改判</button></div>
+              <span class="donetag">✓ 已复核</span></div>
+          </div>
+          <div class="find r-pass" data-result="pass">
+            <div class="l1"><div class="title"><span class="sicon si-pass">✓</span><span class="tname">申请人具备高级职称</span></div>
+              <span class="vpill pass">机审 ✓ 通过 <span class="conf">置信度 99%</span></span></div>
+            <div class="sugg">符合要求。</div>
+            <div class="l3"><span class="ev" data-ev="ev3">📎 字段：职称 ↗</span>
+              <div class="acts"><button class="btn confirm" data-confirm>确认</button></div><span class="donetag">✓ 已复核</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 预算 -->
+      <div class="group" data-dim>
+        <div class="ghead"><div class="gleft"><span class="gcaret">▾</span><span class="gname">预算</span>
+          <span class="gcount"><span class="pill fail">1 不通过</span><span class="pill review">1 待复核</span></span></div>
+          <button class="gbtn">✓ 确认本组通过项</button></div>
+        <div class="gbody">
+          <div class="find r-fail" data-result="fail">
+            <div class="l1"><div class="title"><span class="sicon si-fail">✕</span><span class="tname">设备费占比超限</span></div>
+              <span class="vpill fail">机审 ✕ 不通过 <span class="conf">置信度 91%</span></span></div>
+            <div class="meta2"><span class="code">SD-RULE-031</span><span class="sev high">● 严重度 高</span></div>
+            <div class="sugg">设备费 24 万，占直接费用 24%，超过 20% 上限。</div>
+            <div class="l3"><span class="ev" data-ev="ev4">📎 预算明细 第2项 ↗</span>
+              <div class="acts"><button class="btn confirm" data-confirm>确认</button><button class="btn over" data-over="设备费占比超限|✕ 不通过|91%|《预算编制说明》：设备费一般不超过直接费用的 20%。">改判</button></div>
+              <span class="donetag">✓ 已复核</span></div>
+          </div>
+          <div class="find r-review" data-result="review">
+            <div class="l1"><div class="title"><span class="sicon si-review">!</span><span class="tname">劳务费占比偏高</span></div>
+              <span class="vpill review">机审 ! 待复核 <span class="conf">置信度 58%</span><span class="lowconf">⚠ 建议人工</span></span></div>
+            <div class="meta2"><span class="code">SD-RULE-033</span><span class="sev mid">● 严重度 中</span></div>
+            <div class="sugg">劳务费占比 38%，未超硬性上限但偏高，建议人工确认合理性。</div>
+            <div class="l3"><span class="ev" data-ev="ev5">📎 预算明细 第5项 ↗</span>
+              <div class="acts"><button class="btn confirm" data-confirm>确认</button><button class="btn over" data-over="劳务费占比偏高|! 待复核|58%|《预算编制说明》：劳务费应据实编列。">改判</button></div>
+              <span class="donetag">✓ 已复核</span></div>
+          </div>
+          <div class="find r-pass" data-result="pass">
+            <div class="l1"><div class="title"><span class="sicon si-pass">✓</span><span class="tname">预算总额未超限</span></div>
+              <span class="vpill pass">机审 ✓ 通过 <span class="conf">置信度 97%</span></span></div>
+            <div class="sugg">符合要求。</div>
+            <div class="l3"><span class="ev" data-ev="ev6">📎 预算表·合计 ↗</span>
+              <div class="acts"><button class="btn confirm" data-confirm>确认</button></div><span class="donetag">✓ 已复核</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 合作单位：含一条「已人工改判」示例 -->
+      <div class="group" data-dim>
+        <div class="ghead"><div class="gleft"><span class="gcaret">▾</span><span class="gname">合作单位</span>
+          <span class="gcount"><span class="pill ok">机审1不通过·已人工通过</span></span></div>
+          <button class="gbtn">✓ 确认本组通过项</button></div>
+        <div class="gbody">
+          <div class="find r-over done" data-result="pass">
+            <div class="l1"><div class="title"><span class="sicon si-pass">✓</span><span class="tname">合作单位公章缺失</span></div>
+              <span class="overchain"><span class="mach">机审 ✕</span><span class="arrow">→</span>人工 ✓ 通过</span></div>
+            <div class="meta2"><span class="code">SD-RULE-042</span></div>
+            <div class="human">已补充合作单位盖章扫描件并核验通过。<span class="who">复核人 dev · 2026-06-26 14:40</span></div>
+            <div class="l3"><span class="ev" data-ev="ev7">📎 合作协议·附件3 ↗</span><span class="donetag">✓ 已复核</span></div>
+          </div>
+          <div class="find r-pass" data-result="pass">
+            <div class="l1"><div class="title"><span class="sicon si-pass">✓</span><span class="tname">合作单位资质有效</span></div>
+              <span class="vpill pass">机审 ✓ 通过 <span class="conf">置信度 95%</span></span></div>
+            <div class="sugg">符合要求。</div>
+            <div class="l3"><span class="ev" data-ev="ev8">📎 合作协议 ↗</span>
+              <div class="acts"><button class="btn confirm" data-confirm>确认</button></div><span class="donetag">✓ 已复核</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 全通过组：折叠沉底 -->
+      <div class="group allpass collapsed" data-dim>
+        <div class="ghead"><div class="gleft"><span class="gcaret">▾</span><span class="gname">附件材料</span>
+          <span class="gcount"><span class="pill ok">✓ 全部通过 (6)</span></span></div>
+          <button class="gbtn">✓ 确认本组通过项</button></div>
+        <div class="gbody">
+          <div class="find r-pass" data-result="pass"><div class="l1"><div class="title"><span class="sicon si-pass">✓</span><span class="tname">申请书签字完整</span></div><span class="vpill pass">机审 ✓ 通过 <span class="conf">置信度 99%</span></span></div><div class="l3"><span class="ev" data-ev="ev9">📎 申请书·签字页 ↗</span><div class="acts"><button class="btn confirm" data-confirm>确认</button></div><span class="donetag">✓ 已复核</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 抽屉 -->
+<div class="mask" id="mask"></div>
+<aside class="drawer" id="drawer">
+  <div class="dwh"><h3 id="dwTitle">出处原文</h3><button class="x" id="dwClose">×</button></div>
+  <div class="dwb" id="dwBody"></div>
+  <div class="dwf" id="dwFoot" style="display:none"></div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let reviewed=5; const TOTAL=20;
+  function setProgress(){const p=Math.round(reviewed/TOTAL*100);
+    progBar.style.width=p+'%'; progBar2.style.width=p+'%';
+    progText.textContent='复核进度 '+reviewed+'/'+TOTAL; progText2.textContent='复核进度 '+reviewed+'/'+TOTAL;}
+  function toast(m){const t=toastEl; t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1600);}
+  const progBar=document.getElementById('progBar'),progBar2=document.getElementById('progBar2'),
+        progText=document.getElementById('progText'),progText2=document.getElementById('progText2'),toastEl=document.getElementById('toast');
+
+  // 出处原文（示例）
+  const EV={
+    ev1:{src:'申请书·正文 第3段', text:'……项目负责人张三，男，1980 年生，<span class="hl">自 2023 年起承担本单位科研任务，2022 年因工作调动曾中断 1 年</span>，现为本院教授……', rule:'负责人连续承担年限不满足', verdict:'✕ 不通过'},
+    ev2:{src:'结构化字段：在研项目数', text:'在研项目数 = <span class="hl">2</span>（来源：申请书·研究基础）。同类限项上限 2 项。', rule:'负责人在研项目数接近上限', verdict:'! 待复核'},
+    ev3:{src:'结构化字段：职称', text:'职称 = <span class="hl">教授（正高）</span>。', rule:'申请人具备高级职称', verdict:'✓ 通过'},
+    ev4:{src:'预算明细 第2项', text:'设备费：<span class="hl">240,000 元</span>，占直接费用合计 1,000,000 元的 <span class="hl">24%</span>。', rule:'设备费占比超限', verdict:'✕ 不通过'},
+    ev5:{src:'预算明细 第5项', text:'劳务费：<span class="hl">380,000 元</span>，占直接费用 38%。', rule:'劳务费占比偏高', verdict:'! 待复核'},
+    ev6:{src:'预算表·合计', text:'直接费用合计 <span class="hl">1,000,000 元</span>，未超过资助限额。', rule:'预算总额未超限', verdict:'✓ 通过'},
+    ev7:{src:'合作协议·附件3', text:'合作协议第 2 页：乙方（合作单位）<span class="hl">已加盖单位公章</span>（补充件）。', rule:'合作单位公章缺失', verdict:'✕ 不通过 → 已改判'},
+    ev8:{src:'合作协议', text:'合作单位统一社会信用代码 <span class="hl">913100007...（有效）</span>。', rule:'合作单位资质有效', verdict:'✓ 通过'},
+    ev9:{src:'申请书·签字页', text:'负责人签字 <span class="hl">已签</span>，单位公章 <span class="hl">已盖</span>。', rule:'申请书签字完整', verdict:'✓ 通过'},
+  };
+
+  const mask=document.getElementById('mask'),drawer=document.getElementById('drawer'),
+        dwTitle=document.getElementById('dwTitle'),dwBody=document.getElementById('dwBody'),dwFoot=document.getElementById('dwFoot');
+  function openDrawer(){mask.classList.add('open');drawer.classList.add('open');}
+  function closeDrawer(){mask.classList.remove('open');drawer.classList.remove('open');}
+  mask.onclick=closeDrawer; document.getElementById('dwClose').onclick=closeDrawer;
+
+  // P1-② 出处抽屉
+  function showEvidence(key){
+    const e=EV[key]; if(!e) return;
+    dwTitle.textContent='出处原文';
+    dwBody.innerHTML =
+      '<div class="kv">来源：<b>'+e.src+'</b></div>'+
+      '<div class="srcbox">'+e.text+'</div>'+
+      '<div class="dwsec"><div class="t">关联规则</div><div><b>'+e.rule+'</b></div></div>'+
+      '<div class="dwsec"><div class="t">机审判定</div><div>'+e.verdict+'</div></div>';
+    dwFoot.style.display='none';
+    openDrawer();
+  }
+  document.querySelectorAll('.ev').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();showEvidence(el.dataset.ev);}));
+
+  // P1-③ 改判抽屉
+  let overTarget=null, overChoice=null;
+  function showOverrule(btn){
+    overTarget=btn.closest('.find'); overChoice=null;
+    const [name,verdict,conf,clause]=btn.dataset.over.split('|');
+    dwTitle.textContent='人工改判';
+    dwBody.innerHTML =
+      '<div class="kv">规则：<b>'+name+'</b></div>'+
+      '<div class="kv" style="margin-top:8px">机审原判：<b>'+verdict+'</b>（置信度 '+conf+'）</div>'+
+      '<div class="dwsec"><div class="t">依据条款</div><div class="clausebox">'+clause+'</div></div>'+
+      '<div class="dwsec"><div class="t">改判结果</div>'+
+        '<div class="radio-row" id="ovRadios">'+
+          '<div class="radio" data-v="通过">✓ 通过</div>'+
+          '<div class="radio" data-v="不通过">✕ 不通过</div>'+
+          '<div class="radio" data-v="不适用">⊘ 不适用</div>'+
+        '</div></div>'+
+      '<div class="dwsec"><div class="t">处置意见 <span class="req">*必填</span></div>'+
+        '<textarea id="ovRemark" rows="3" placeholder="请填写人工复核意见，将记入审查记录与报告…"></textarea></div>';
+    dwFoot.style.display='flex';
+    dwFoot.innerHTML='<button class="btn link" id="ovCancel">取消</button><button class="btn primary" id="ovSubmit">提交改判</button>';
+    openDrawer();
+    dwBody.querySelectorAll('.radio').forEach(r=>r.onclick=()=>{
+      dwBody.querySelectorAll('.radio').forEach(x=>x.classList.remove('sel')); r.classList.add('sel'); overChoice=r.dataset.v;});
+    document.getElementById('ovCancel').onclick=closeDrawer;
+    document.getElementById('ovSubmit').onclick=submitOverrule;
+  }
+  function submitOverrule(){
+    const remark=document.getElementById('ovRemark').value.trim();
+    if(!overChoice){toast('请选择改判结果');return;}
+    if(!remark){toast('请填写处置意见');return;}
+    // 演示：把目标卡片改成「机审→人工」态
+    const f=overTarget; const machIcon=f.querySelector('.sicon').textContent;
+    const sicon = overChoice==='通过'?'✓':(overChoice==='不通过'?'✕':'⊘');
+    f.className='find r-'+(overChoice==='通过'?'over':(overChoice==='不通过'?'fail':'pass'))+' done';
+    f.querySelector('.l1').innerHTML =
+      '<div class="title"><span class="sicon '+(overChoice==='通过'?'si-pass':(overChoice==='不通过'?'si-fail':'si-pass'))+'">'+sicon+'</span>'+
+      '<span class="tname">'+f.querySelector('.tname').textContent+'</span></div>'+
+      '<span class="overchain"><span class="mach">机审 '+machIcon+'</span><span class="arrow">→</span>人工 '+sicon+' '+overChoice+'</span>';
+    const sugg=f.querySelector('.sugg'); if(sugg) sugg.remove();
+    const human=document.createElement('div'); human.className='human';
+    human.innerHTML=remark+'<span class="who">复核人 dev · 刚刚</span>';
+    f.querySelector('.l3').insertAdjacentElement('beforebegin',human);
+    if(!f.dataset.counted){f.dataset.counted=1; reviewed=Math.min(TOTAL,reviewed+1); setProgress();}
+    closeDrawer(); toast('已提交改判');
+  }
+  document.querySelectorAll('.over').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();showOverrule(b);}));
+
+  // 统计卡筛选
+  let activeFilter=null;
+  document.querySelectorAll('.stat').forEach(card=>card.addEventListener('click',()=>{
+    const f=card.dataset.filter; activeFilter=(activeFilter===f)?null:f;
+    document.querySelectorAll('.stat').forEach(c=>c.classList.toggle('active',c.dataset.filter===activeFilter));
+    document.querySelectorAll('.find').forEach(x=>{x.style.display=(!activeFilter||x.dataset.result===activeFilter)?'':'none';});
+    document.querySelectorAll('.group').forEach(g=>{const any=[...g.querySelectorAll('.find')].some(x=>x.style.display!=='none');
+      g.style.display=(activeFilter&&!any)?'none':''; if(activeFilter&&any)g.classList.remove('collapsed');});
+  }));
+  // 组折叠
+  document.querySelectorAll('.ghead').forEach(h=>h.addEventListener('click',e=>{if(e.target.closest('.gbtn'))return; h.parentElement.classList.toggle('collapsed');}));
+  // 确认
+  function confirmFind(f){if(f.classList.contains('done'))return; f.classList.add('done'); if(!f.dataset.counted){f.dataset.counted=1;reviewed=Math.min(TOTAL,reviewed+1);setProgress();}}
+  document.querySelectorAll('[data-confirm]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();confirmFind(b.closest('.find'));toast('已确认机审判定');}));
+  document.querySelectorAll('.gbtn').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();let n=0;
+    b.closest('.group').querySelectorAll('.find.r-pass').forEach(f=>{if(!f.classList.contains('done')){confirmFind(f);n++;}});
+    toast(n?('已确认本组 '+n+' 个通过项'):'本组通过项已全部确认');}));
+
+  setProgress();
+</script>
+</body>
+</html>

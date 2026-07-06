@@ -1,0 +1,154 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  smart-doc 方案B docker-compose —— 草稿 v1（待验证）                            ║
+# ║  目标：本地 docker 同网络跑 blade-agent + 你的后端 + MySQL，agent 用服务名直连   ║
+# ║       你的后端，彻底免隧道。参考 blade-coa v0.4.7 精简而来。                     ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║  服务（host:容器端口）：                                                         ║
+# ║    mysql              3306   库 smart（首启自动建表）                            ║
+# ║    skill-registry     8010   技能注册中心（拉镜像 v0.2.9）                       ║
+# ║    smart-doc-backend  8000   你的 FastAPI 后端（自己 build，对应 coa-service）   ║
+# ║    blade-agent        8020   AI Agent（拉镜像 v0.4.7，干净通用 agent）           ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║  ⚠️ 跑之前还差 3 件（见文末 TODO）：                                            ║
+# ║   1) backend/Dockerfile（smart-doc-backend 的 build 用）—— 还没有，下一步起草    ║
+# ║   2) .env 填 LLM 三件套（API_KEY/BASE_URL/MODEL_ID）—— agent 调模型的硬前提      ║
+# ║   3) 前端 .env：VITE_BLADE_API_BASE=http://localhost:8020                       ║
+# ║      VITE_SMART_DOC_API=http://smart-doc-backend:8000（给容器内 shim 用，不是    ║
+# ║      localhost！shim 在 agent 容器里跑，要用 docker 服务名才连得到你后端）       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+services:
+  # ───────── 数据库（库 smart，首启自动导入 schema 建 57 表）─────────
+  mysql:
+    container_name: smart-mysql
+    image: mysql:8.0
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DB:-smart}
+    ports:
+      - "${HOST_MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # 首次启动时自动执行（建表）。容器只在数据目录为空时跑一次 initdb.d。
+      # 注：你的 schema 文件名含中文，Windows 下 docker 挂载一般可行；若报错改用英文名软链。
+      - ./docs/file/审查系统-schema_mysql.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+    restart: unless-stopped
+
+  # ───────── 技能注册中心（拉镜像；smart-doc 用最简配置，不挂内置技能）─────────
+  # 你的技能走会话级 uploadSessionSkill 动态推送，不依赖这里挂技能目录。
+  # 保留本服务主要是满足 blade-agent 的可选语义搜索/启动依赖；空跑即可。
+  skill-registry:
+    container_name: smart-skill-registry
+    image: registry.cn-beijing.aliyuncs.com/bladeai/skill-registry:v0.2.9
+    environment:
+      SKILL_REGISTRY_HOST: 0.0.0.0
+      SKILL_REGISTRY_PORT: "8010"
+      SKILL_REGISTRY_EMBEDDING_PROVIDER: none   # 纯 BM25，不需要 embedding key
+    ports:
+      - "${HOST_SKILL_REGISTRY_PORT:-8010}:8010"
+    volumes:
+      - skill_registry_state:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ───────── 你的后端（对应 coa-service；自己 build）─────────
+  smart-doc-backend:
+    container_name: smart-doc-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile        # TODO①：backend/Dockerfile 还没有，下一步起草
+    environment:
+      # 关键：连 docker 网络里的 mysql 服务名，不是 localhost
+      SMART_DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-root}@mysql:3306/${MYSQL_DB:-smart}?charset=utf8mb4
+      # 写端点鉴权 key（agent 推的 shim 调写接口要带 X-API-Key）。与前端推 shim 用的 key 一致。
+      SMART_API_KEY: ${SMART_API_KEY:-}
+      PYTHONIOENCODING: utf-8
+    ports:
+      - "${HOST_BACKEND_PORT:-8000}:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ───────── AI Agent（拉镜像 v0.4.7；剥掉所有 coa 私货，干净通用 agent）─────────
+  blade-agent:
+    container_name: smart-blade-agent
+    # v0.5.16 匹配前端 SDK 0.5.11 的 skills:upload 端点（v0.4.7 太旧无此端点 → 405）
+    image: registry.cn-beijing.aliyuncs.com/bladeai/blade-agent:${BLADE_AGENT_VERSION:-v0.5.16}
+    env_file:
+      - path: .env
+        required: false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # 墙内 LLM 走宿主代理时用
+    environment:
+      # —— LLM 三件套（TODO②：在 .env 填）。agent 没有这个起不来/不能对话 ——
+      API_KEY: ${LLM_API_KEY:-}
+      BASE_URL: ${LLM_BASE_URL:-https://openrouter.ai/api/v1}
+      MODEL_ID: ${LLM_MODEL_ID:-}
+      # —— 关 Docker sandbox：技能 bash 直接在 agent 主容器跑（免 DinD/沙盒镜像）。
+      #    v0.5.x 生产默认强制沙盒；本地探针先试关掉走 in-process。 ——
+      SANDBOX_ENABLED: ${SANDBOX_ENABLED:-false}
+      # —— 运行时目录 ——
+      WORKSPACE_PATH: /app/workspace
+      FRONTEND_CONFIG_DIR: /app/data/frontend_config
+      SKILL_REGISTRY_URL: http://skill-registry:8010
+      # —— 出站代理：默认空=直连；墙内需代理则在 .env 设 LLM_HTTP_PROXY ——
+      HTTP_PROXY: ${LLM_HTTP_PROXY:-}
+      HTTPS_PROXY: ${LLM_HTTP_PROXY:-}
+      http_proxy: ${LLM_HTTP_PROXY:-}
+      https_proxy: ${LLM_HTTP_PROXY:-}
+      # 内部容器互调不走代理（关键：保证 agent→smart-doc-backend 服务名直连不被代理拦）
+      NO_PROXY: localhost,127.0.0.1,mysql,skill-registry,smart-doc-backend,blade-agent,172.16.0.0/12,.local
+      no_proxy: localhost,127.0.0.1,mysql,skill-registry,smart-doc-backend,blade-agent,172.16.0.0/12,.local
+    volumes:
+      # v0.5.x 沙盒经宿主 docker spawn 时，会 inspect agent 自身挂载来解析 workspace/skills_root
+      # 的源路径再 bind 进沙盒 → 二者必须是「挂载」。用命名卷（而非 Windows 宿主 bind-mount）：
+      # 命名卷在 Linux VM 内，既满足挂载检查、沙盒能 bind，又避开 Windows 文件系统的 rename/权限怪癖
+      # （宿主 bind-mount 会让 skill 安装的原子 rename 报 Permission denied）。
+      - agent_workspace:/app/workspace
+      - agent_skills:/app/agent_env/skills
+      - agent_frontend_config:/app/data/frontend_config
+      # v0.5.x 强制 Docker sandbox：挂宿主 docker socket，让 agent 用本机 Docker Desktop spawn 每会话沙盒
+      - //var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "${HOST_AGENT_PORT:-8020}:8020"
+    depends_on:
+      skill-registry:
+        condition: service_started
+      smart-doc-backend:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  agent_workspace:
+  agent_skills:
+  agent_frontend_config:
+  skill_registry_state:
+
+# ════════════════════════ 跑起来之前的 TODO 清单 ════════════════════════
+# [TODO①] 起草 backend/Dockerfile：基于 python:3.12，装 requirements.txt，
+#         CMD uvicorn app.main:app --host 0.0.0.0 --port 8000
+# [TODO②] 建 .env（项目根），至少填：
+#           LLM_API_KEY=...          # openrouter 或其他 OpenAI 兼容服务的 key
+#           LLM_BASE_URL=https://openrouter.ai/api/v1
+#           LLM_MODEL_ID=...         # 例如某个 openrouter 模型 id
+#           SMART_API_KEY=...        # 后端写端点鉴权（与前端推 shim 的 key 一致）
+#           LLM_HTTP_PROXY=          # 墙内需代理时填 http://host.docker.internal:7890 之类
+# [TODO③] 前端 .env：
+#           VITE_BLADE_API_BASE=http://localhost:8020          # 浏览器连本地 agent
+#           VITE_SMART_DOC_API=http://smart-doc-backend:8000   # 给容器内 shim 用（服务名！）
+#           VITE_SMART_DOC_API_KEY=<同 SMART_API_KEY>
+# [验证] docker compose up -d  → 浏览器开 http://localhost:8020 与 agent 对话 →
+#         推 shim 抽规则 → agent 经服务名 http://smart-doc-backend:8000 入库（全程无隧道）
