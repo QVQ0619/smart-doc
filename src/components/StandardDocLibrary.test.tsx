@@ -55,7 +55,7 @@ beforeEach(() => {
   // 重置 blade 状态
   _bladeState.activeSessionId = "session-123";
   // 重置路由 store
-  useRouteStore.setState({ nav: { name: "home" } });
+  useRouteStore.setState({ nav: { name: "my-tasks" } });
 
   vi.mocked(api.listStandardDocs).mockResolvedValue([sample] as never);
   vi.mocked(api.deleteStandardDoc).mockResolvedValue();

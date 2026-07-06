@@ -24,6 +24,13 @@ backend/.env
 
 # 数据库导出(含数据),不入库
 smart.sql
+smart.import.sql
+
+# 后端本地运行日志,不入库
+backend/*.log
+
+# 测试用样例报告材料(可能涉密),不入库
+任务文档/
 
 # 隧道运行日志,不入库
 blade/*.log

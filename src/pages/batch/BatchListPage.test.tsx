@@ -27,7 +27,7 @@ const mockBatch = {
 describe("BatchListPage", () => {
   beforeEach(() => {
     // 每个测试前重置路由状态
-    useRouteStore.setState({ nav: { name: "home" } });
+    useRouteStore.setState({ nav: { name: "my-tasks" } });
   });
 
   it("渲染批次卡片列表（含批次号、计数）", async () => {
