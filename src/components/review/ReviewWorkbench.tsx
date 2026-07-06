@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { message } from "antd";
+import { message, Button } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getPackageReview, postReviewAction,
+import { getPackageReview, postReviewAction, exportPackageReport,
          type ReviewCheck, type PackageReview } from "../../api/review";
 import { getPackageSegments, getPackageStructured } from "../../api/materials";
 import { type ResultKey } from "./review-constants";
@@ -18,6 +18,7 @@ export default function ReviewWorkbench({ packageId }: { packageId: number }) {
   const [filter, setFilter] = useState<ResultKey | null>(null);
   const [overrule, setOverrule] = useState<ReviewCheck | null>(null);
   const [evidence, setEvidence] = useState<ReviewCheck | null>(null);
+  const [exporting, setExporting] = useState(false);
   const segQ = useQuery({ queryKey: ["pkg-segments", packageId], queryFn: () => getPackageSegments(packageId), enabled: evidence !== null });
   const structQ = useQuery({ queryKey: ["pkg-structured", packageId], queryFn: () => getPackageStructured(packageId), enabled: evidence !== null });
   const mut = useMutation({
@@ -38,6 +39,17 @@ export default function ReviewWorkbench({ packageId }: { packageId: number }) {
   if (!data || data.round === null)
     return <span>该申报包尚未形式审查（可在聊天中说"形式审查这个申报包"）</span>;
 
+  const onExport = async () => {
+    setExporting(true);
+    try {
+      await exportPackageReport(packageId);
+    } catch (e) {
+      message.error("报告导出失败：" + (e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const confirm = (c: ReviewCheck) => mut.mutate({ id: c.round_check_id, body: { action: "confirm", version: c.version } });
   const confirmGroup = (g: DimensionGroupData) =>
     g.checks.filter((c) => c.status === "open" && resultOf(c) === "pass")
@@ -45,7 +57,12 @@ export default function ReviewWorkbench({ packageId }: { packageId: number }) {
 
   return (
     <div>
-      <VerdictBanner conclusion={data.round.conclusion} counts={counts} reviewed={reviewed} total={checks.length} />
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <VerdictBanner conclusion={data.round.conclusion} counts={counts} reviewed={reviewed} total={checks.length} />
+        </div>
+        <Button type="primary" loading={exporting} onClick={onExport}>导出报告</Button>
+      </div>
       <StatCards counts={counts} active={filter} onToggle={(k) => setFilter(filter === k ? null : k)} />
       {groups.filter((g) => !filter || g.checks.some((c) => resultOf(c) === filter)).map((g) => (
         <DimensionGroup key={g.code} group={g} filter={filter}
