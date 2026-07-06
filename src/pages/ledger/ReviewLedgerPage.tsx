@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Table, Typography, Tag, Button, Modal, List, Space, Input, Empty, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
-import { listLedger, openReport, type LedgerTask } from "../../api/tasks";
+import { listLedger, type LedgerTask } from "../../api/tasks";
+import { useReportPreview } from "../../components/useReportPreview";
 
 const STATUS_TAG: Record<string, { t: string; c: string }> = {
   created: { t: "待分发", c: "default" },
@@ -16,6 +17,7 @@ export default function ReviewLedgerPage() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [cur, setCur] = useState<LedgerTask | null>(null);
+  const { openPreview, previewModal } = useReportPreview();
 
   useEffect(() => {
     (async () => {
@@ -97,9 +99,7 @@ export default function ReviewLedgerPage() {
                     key="view"
                     size="small"
                     type="link"
-                    onClick={() =>
-                      openReport(cur.id, r.id).catch((e) => message.error(e instanceof Error ? e.message : "打开失败"))
-                    }
+                    onClick={() => openPreview(cur.id, r)}
                   >
                     预览 / 下载
                   </Button>,
@@ -119,6 +119,7 @@ export default function ReviewLedgerPage() {
           />
         )}
       </Modal>
+      {previewModal}
     </div>
   );
 }

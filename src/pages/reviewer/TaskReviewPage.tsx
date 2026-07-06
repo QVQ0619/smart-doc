@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Card, Typography, Button, Space, Tag, message, Row, Col, Divider, Alert, Tooltip } from "antd";
 import { FileTextOutlined } from "@ant-design/icons";
-import { getTask, openReport, type TaskDetail } from "../../api/tasks";
+import { useSessionStore, useChat, sessionsApi, buildMessageContent } from "@blade-hq/agent-kit/react";
+import { getTask, fetchReportFile, type TaskDetail, type TaskReport } from "../../api/tasks";
+import { useReportPreview } from "../../components/useReportPreview";
 import { useRouteStore } from "../../store/useRouteStore";
 import { useAuthStore } from "../../store/useAuthStore";
 
-// 5 个审查按钮:与报告类型一一对应(本期占位,内部逻辑由后续实现)
+// 5 个审查按钮:与报告类型一一对应
 const REVIEW_BUTTONS: { type: string; label: string }[] = [
   { type: "comprehensive", label: "综合论证报告审查" },
   { type: "economy", label: "经济性审查" },
@@ -16,8 +18,12 @@ const REVIEW_BUTTONS: { type: string; label: string }[] = [
 
 export default function TaskReviewPage({ taskId, taskName }: { taskId: number; taskName: string }) {
   const [detail, setDetail] = useState<TaskDetail | null>(null);
+  const [reviewing, setReviewing] = useState<string | null>(null);
+  const { openPreview, previewModal } = useReportPreview();
   const navigate = useRouteStore((s) => s.navigate);
   const user = useAuthStore((s) => s.user);
+  const activeSessionId = useSessionStore((s) => s.activeSessionId);
+  const { send } = useChat(activeSessionId ?? "");
 
   useEffect(() => {
     getTask(taskId)
@@ -28,6 +34,32 @@ export default function TaskReviewPage({ taskId, taskName }: { taskId: number; t
   const reportByType = (t: string) => detail?.reports.find((r) => r.report_type === t);
   // 只读:项目已分发给他人(管理员查看时)。分发给自己/未分发则可审查。
   const readOnly = detail != null && detail.assignee_id != null && detail.assignee_id !== user?.id;
+
+  // 开始审查:把报告文件推到右侧对话(等同聊天框手动上传到会话工作区),再自动发起审查消息
+  async function startReview(label: string, type: string, rep: TaskReport) {
+    if (!activeSessionId) {
+      message.warning("请先在右侧开始对话");
+      return;
+    }
+    setReviewing(type);
+    try {
+      const name = rep.file_name || `${rep.report_name}审查报告`;
+      const file = await fetchReportFile(taskId, rep.id, name);
+      const { uploaded } = await sessionsApi.uploadFiles(activeSessionId, ".", [{ file, name }]);
+      if (uploaded.length === 0) throw new Error("文件推送到对话失败");
+      send(
+        buildMessageContent(
+          `请开始「${label}」：待审报告《${name}》已上传到会话工作区，请阅读该文件并依据审查规则开展审查，输出审查意见。（任务：${taskName}）`,
+          [{ kind: "file", name, uploadedPath: uploaded[0] }],
+        ),
+      );
+      message.success("报告已推送到右侧对话，审查已发起");
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : "发起审查失败");
+    } finally {
+      setReviewing(null);
+    }
+  }
 
   return (
     <div style={{ padding: 24 }}>
@@ -58,11 +90,20 @@ export default function TaskReviewPage({ taskId, taskName }: { taskId: number; t
                     {rep?.uploaded ? <Tag color="green">报告已上传</Tag> : <Tag>无报告</Tag>}
                   </Space>
                   <Space>
-                    <Tooltip title={readOnly ? "已分发给他人，需先撤回才能自行审查" : ""}>
+                    <Tooltip
+                      title={
+                        readOnly
+                          ? "已分发给他人，需先撤回才能自行审查"
+                          : !rep?.uploaded
+                            ? "请先上传报告"
+                            : ""
+                      }
+                    >
                       <Button
                         type="primary"
-                        disabled={readOnly}
-                        onClick={() => message.info("该审查功能待实现")}
+                        disabled={readOnly || !rep?.uploaded}
+                        loading={reviewing === b.type}
+                        onClick={() => rep && startReview(b.label, b.type, rep)}
                       >
                         开始审查
                       </Button>
@@ -70,9 +111,7 @@ export default function TaskReviewPage({ taskId, taskName }: { taskId: number; t
                     <Button
                       icon={<FileTextOutlined />}
                       disabled={!rep?.uploaded}
-                      onClick={() =>
-                        rep && openReport(taskId, rep.id).catch((e) => message.error(e instanceof Error ? e.message : "打开失败"))
-                      }
+                      onClick={() => rep && openPreview(taskId, rep)}
                     >
                       查看原始报告
                     </Button>
@@ -83,6 +122,7 @@ export default function TaskReviewPage({ taskId, taskName }: { taskId: number; t
           );
         })}
       </Row>
+      {previewModal}
     </div>
   );
 }
