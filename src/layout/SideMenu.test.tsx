@@ -21,8 +21,7 @@ beforeEach(() => {
 
 test("渲染品牌名与评审专家全部菜单项", () => {
   render(<SideMenu />);
-  expect(screen.getByText("装备研制立项")).toBeInTheDocument();
-  expect(screen.getByText("AI辅助审查评估系统")).toBeInTheDocument();
+  expect(screen.getByText("装备研制立项AI辅助审查评估系统")).toBeInTheDocument();
   for (const label of [
     "仪表盘",
     "立项论证审查",
@@ -56,9 +55,9 @@ test("点击菜单项更新 nav store", async () => {
   await waitFor(() => expect(useRouteStore.getState().nav.name).toBe("review-ledger"));
 });
 
-test("折叠态渲染展开按钮", () => {
+test("折叠态渲染展开按钮与迷你品牌", () => {
   useMenuCollapseStore.setState({ collapsed: true });
   render(<SideMenu />);
   expect(screen.getByLabelText("展开菜单")).toBeInTheDocument();
-  expect(screen.queryByText("仪表盘")).not.toBeInTheDocument();
+  expect(screen.getByText("审")).toBeInTheDocument();
 });

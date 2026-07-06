@@ -1,17 +1,20 @@
 import { useMemo } from "react";
-import { Tooltip } from "antd";
+import { Menu, Avatar, Dropdown, Tag, theme } from "antd";
+import type { MenuProps } from "antd";
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
-  SafetyCertificateFilled,
 } from "@ant-design/icons";
 import { MENU_GROUPS, type RouteKey } from "./menuConfig";
 import { useRouteStore } from "../store/useRouteStore";
 import { useMenuCollapseStore } from "../store/useMenuCollapseStore";
 import { useAuthStore } from "../store/useAuthStore";
 
+// 白色主题侧边栏,样式对齐 blade-oauth 的 AdminLayout:
+// 品牌主色标题 + antd Menu 分组标签 + 头像 Dropdown 退出 + 底部裸图标折叠行。
 export default function SideMenu() {
+  const { token: t } = theme.useToken();
   const nav = useRouteStore((s) => s.nav);
   const navigate = useRouteStore((s) => s.navigate);
   const collapsed = useMenuCollapseStore((s) => s.collapsed);
@@ -20,14 +23,13 @@ export default function SideMenu() {
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const logout = useAuthStore((s) => s.logout);
 
-  // 按当前角色过滤菜单项
+  // 按当前角色过滤,保持原有扁平菜单结构(不加分组标签)
   const role = isAdmin ? "admin" : "reviewer";
-  const groups = useMemo(
+  const items: MenuProps["items"] = useMemo(
     () =>
-      MENU_GROUPS.map((g) => ({
-        title: g.title,
-        items: g.items.filter((it) => !it.roles || it.roles.includes(role)),
-      })).filter((g) => g.items.length > 0),
+      MENU_GROUPS.flatMap((g) => g.items)
+        .filter((it) => !it.roles || it.roles.includes(role))
+        .map((it) => ({ key: it.key, icon: it.icon, label: it.label })),
     [role],
   );
 
@@ -43,92 +45,99 @@ export default function SideMenu() {
           ? "my-tasks"
           : nav.name;
 
-  if (collapsed) {
-    return (
-      <div className="menu-rail menu-rail--dark">
-        <Tooltip title="展开菜单" placement="right">
-          <button
-            type="button"
-            className="side-menu__icon-btn"
-            aria-label="展开菜单"
-            onClick={toggle}
-          >
-            <MenuUnfoldOutlined />
-          </button>
-        </Tooltip>
-        <span className="menu-rail__label">菜单</span>
-      </div>
-    );
-  }
-
-  // 扁平序号:入场动效按序错峰
-  let flatIdx = 0;
+  const userMenu: MenuProps = {
+    items: [{ key: "logout", icon: <LogoutOutlined />, label: "退出登录", danger: true }],
+    onClick: ({ key }) => {
+      if (key === "logout") logout();
+    },
+  };
 
   return (
-    <div className="side-menu">
-      <div className="side-menu__brand">
-        <div className="side-menu__emblem">
-          <SafetyCertificateFilled />
-        </div>
-        <div className="side-menu__brand-text">
-          <span className="side-menu__brand-eyebrow">装备研制立项</span>
-          <span className="side-menu__brand-title">AI辅助审查评估系统</span>
-        </div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {/* 品牌 */}
+      <div
+        style={{
+          flexShrink: 0,
+          padding: collapsed ? "20px 8px 12px" : "20px 16px 12px",
+          textAlign: "center",
+          fontWeight: 700,
+          fontSize: collapsed ? 16 : 15,
+          lineHeight: "22px",
+          color: t.colorPrimary,
+        }}
+      >
+        {collapsed ? "审" : "装备研制立项AI辅助审查评估系统"}
       </div>
 
-      <nav className="side-menu__nav">
-        {groups.map((g) => (
-          <div key={g.title}>
-            {g.items.length > 1 && <div className="side-menu__group-title">{g.title}</div>}
-            {g.items.map((it) => {
-              const active = it.key === selectedKey;
-              const idx = flatIdx++;
-              return (
-                <button
-                  key={it.key}
-                  type="button"
-                  className={"side-menu__item" + (active ? " side-menu__item--active" : "")}
-                  style={{ animationDelay: `${idx * 30}ms` }}
-                  onClick={() => navigate({ name: it.key as RouteKey })}
-                >
-                  <span className="side-menu__item-icon">{it.icon}</span>
-                  <span className="side-menu__item-label">{it.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
+      {/* 菜单 */}
+      <Menu
+        mode="inline"
+        inlineCollapsed={collapsed}
+        selectedKeys={[selectedKey]}
+        items={items}
+        onClick={({ key }) => navigate({ name: key as RouteKey })}
+        style={{ borderInlineEnd: 0, flex: 1, minHeight: 0, overflowY: "auto" }}
+      />
 
+      {/* 用户信息 */}
       {user && (
-        <div className="side-menu__footer">
-          <div className="side-menu__user">
-            <div className="side-menu__avatar">
-              {(user.display_name ?? user.username).slice(0, 1)}
+        <div
+          style={{
+            flexShrink: 0,
+            borderTop: `1px solid ${t.colorBorderSecondary}`,
+            padding: collapsed ? "12px 0" : "12px 12px",
+          }}
+        >
+          <Dropdown menu={userMenu} placement="topRight" trigger={["click"]}>
+            <div
+              className="side-user-trigger"
+              style={{
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: collapsed ? "center" : "flex-start",
+                gap: 8,
+                padding: collapsed ? "4px 0" : 4,
+                borderRadius: t.borderRadius,
+              }}
+            >
+              <Avatar size="small" style={{ background: t.colorPrimary, flexShrink: 0 }}>
+                {(user.display_name ?? user.username).slice(0, 1)}
+              </Avatar>
+              {!collapsed && (
+                <>
+                  <span
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      fontSize: 13,
+                    }}
+                  >
+                    {user.display_name ?? user.username}
+                  </span>
+                  <Tag color={isAdmin ? "blue" : "green"} style={{ marginInlineEnd: 0 }}>
+                    {isAdmin ? "管理员" : "评审专家"}
+                  </Tag>
+                </>
+              )}
             </div>
-            <div className="side-menu__user-meta">
-              <div className="side-menu__user-name">{user.display_name ?? user.username}</div>
-              <span className={"side-menu__role" + (isAdmin ? " side-menu__role--admin" : "")}>
-                {isAdmin ? "管理员" : "评审专家"}
-              </span>
-            </div>
-            <Tooltip title="退出登录">
-              <button
-                type="button"
-                className="side-menu__icon-btn"
-                aria-label="退出登录"
-                onClick={logout}
-              >
-                <LogoutOutlined />
-              </button>
-            </Tooltip>
-          </div>
-          <button type="button" className="side-menu__collapse" aria-label="折叠菜单" onClick={toggle}>
-            <MenuFoldOutlined />
-            <span>收起导航</span>
-          </button>
+          </Dropdown>
         </div>
       )}
+
+      {/* 折叠开关 */}
+      <div
+        role="button"
+        aria-label={collapsed ? "展开菜单" : "折叠菜单"}
+        className="side-collapse-toggle"
+        style={{ borderTop: `1px solid ${t.colorBorderSecondary}` }}
+        onClick={toggle}
+      >
+        {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+      </div>
     </div>
   );
 }
