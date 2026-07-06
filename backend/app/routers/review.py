@@ -1,6 +1,6 @@
 from urllib.parse import quote as _urlquote
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlmodel import Session
 
 from ..auth import require_api_key
@@ -73,19 +73,31 @@ def post_review_action(round_check_id: int, body: ReviewActionIn,
         raise HTTPException(status_code=422, detail=str(e))
 
 
+_DOCX_MEDIA = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
 @router.get("/packages/{package_id}/report/export")
-def export_report(package_id: int, db: Session = Depends(get_session)) -> Response:
+def export_report(package_id: int, format: str = Query("zip"),
+                  db: Session = Depends(get_session)) -> Response:
     try:
         m = build_report_model(db, package_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    docx_bytes = render_docx(m)
-    pdf_bytes = render_pdf(m)
     base = f"立项审查报告_包{package_id}"
-    zip_bytes = package_zip({f"{base}.docx": docx_bytes, f"{base}.pdf": pdf_bytes})
-    fname = f"{base}.zip"
-    disposition = f"attachment; filename=report_{package_id}.zip; filename*=UTF-8''{_urlquote(fname)}"
-    return Response(content=zip_bytes, media_type="application/zip",
-                    headers={"Content-Disposition": disposition})
+
+    def _resp(content: bytes, ext: str, media: str) -> Response:
+        disposition = (f"attachment; filename=report_{package_id}.{ext}; "
+                       f"filename*=UTF-8''{_urlquote(base + '.' + ext)}")
+        return Response(content=content, media_type=media,
+                        headers={"Content-Disposition": disposition})
+
+    if format == "docx":
+        return _resp(render_docx(m), "docx", _DOCX_MEDIA)
+    if format == "pdf":
+        return _resp(render_pdf(m), "pdf", "application/pdf")
+    if format == "zip":
+        zip_bytes = package_zip({f"{base}.docx": render_docx(m), f"{base}.pdf": render_pdf(m)})
+        return _resp(zip_bytes, "zip", "application/zip")
+    raise HTTPException(status_code=422, detail="format 仅支持 docx/pdf/zip")

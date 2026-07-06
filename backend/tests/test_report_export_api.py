@@ -66,6 +66,32 @@ def test_export_returns_zip_with_docx_and_pdf(client, monkeypatch):
                 assert z.read(n)[:4] == b"%PDF"
 
 
+def test_export_format_docx_returns_single_word_file(client, monkeypatch):
+    pkg_id = _reviewed_package(client, monkeypatch)
+    r = client.get(f"/api/packages/{pkg_id}/report/export?format=docx")
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    assert ".docx" in r.headers.get("content-disposition", "")
+    assert r.content[:2] == b"PK"  # docx 是 zip 容器,PK 魔数
+
+
+def test_export_format_pdf_returns_single_pdf_file(client, monkeypatch):
+    pkg_id = _reviewed_package(client, monkeypatch)
+    r = client.get(f"/api/packages/{pkg_id}/report/export?format=pdf")
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "application/pdf"
+    assert ".pdf" in r.headers.get("content-disposition", "")
+    assert r.content[:4] == b"%PDF"
+
+
+def test_export_bad_format_422(client, monkeypatch):
+    pkg_id = _reviewed_package(client, monkeypatch)
+    r = client.get(f"/api/packages/{pkg_id}/report/export?format=txt")
+    assert r.status_code == 422
+
+
 def test_export_unreviewed_package_409(client, monkeypatch):
     monkeypatch.setattr(recognition, "parse_file", lambda path, ext: (
         [recognition.SegmentDraft(1, {"page": 1}, "paragraph", "x")], None))

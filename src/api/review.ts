@@ -73,15 +73,15 @@ function filenameFromDisposition(cd: string, fallback: string): string {
   return plain ? plain[1] : fallback;
 }
 
-export async function exportPackageReport(packageId: number): Promise<void> {
-  const res = await fetch(`/api/packages/${packageId}/report/export`);
+async function downloadReportFormat(packageId: number, format: "docx" | "pdf"): Promise<void> {
+  const res = await fetch(`/api/packages/${packageId}/report/export?format=${format}`);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
   }
   const blob = await res.blob();
   const cd = res.headers.get("Content-Disposition") ?? "";
-  const filename = filenameFromDisposition(cd, `立项审查报告_包${packageId}.zip`);
+  const filename = filenameFromDisposition(cd, `立项审查报告_包${packageId}.${format}`);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -90,4 +90,10 @@ export async function exportPackageReport(packageId: number): Promise<void> {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+// 导出审查报告:分别下载 Word 和 PDF 两个文件(不再打包成 zip)。
+export async function exportPackageReport(packageId: number): Promise<void> {
+  await downloadReportFormat(packageId, "docx");
+  await downloadReportFormat(packageId, "pdf");
 }
