@@ -10,7 +10,7 @@ from .config import settings
 from .db import engine
 from .dimensions import ensure_dimensions
 from .recognition import reset_stuck_processing
-from .routers import standard_docs, clauses, config_packages, material_files, review, batches, auth, tasks
+from .routers import standard_docs, clauses, config_packages, material_files, review, batches, auth, tasks, settings as settings_router
 
 
 def create_app() -> FastAPI:
@@ -37,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(batches.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")
     app.include_router(tasks.router, prefix="/api")
+    app.include_router(settings_router.router, prefix="/api")
 
     @app.get("/api/health")
     def health():

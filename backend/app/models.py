@@ -14,7 +14,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from sqlalchemy import BigInteger, Boolean, Column, ForeignKey, Numeric, Text, text
+from sqlalchemy import BigInteger, Boolean, Column, ForeignKey, Numeric, String, Text, text
 from sqlalchemy.dialects.mysql import DATETIME, JSON
 from sqlmodel import Field, SQLModel
 
@@ -795,6 +795,14 @@ class ModelCallLog(SQLModel, table=True):
     latency_ms: Optional[int] = None
 
 
+class SysSetting(SQLModel, table=True):
+    """系统设置(key-value):如「开始审查」提示词模板等可配置项。"""
+    __tablename__ = "sys_setting"
+    key: str = Field(sa_column=Column(String(64), primary_key=True))
+    value: str = _text_req()
+    updated_at: Optional[datetime] = _dt(nullable=False, now=True)
+
+
 class AuditLog(SQLModel, table=True):
     __tablename__ = "audit_log"
     id: Optional[int] = _pk()
@@ -823,5 +831,5 @@ __all__ = [
     "ReviewRound", "RoundCheck", "CheckReviewAction", "FindingEvidence", "ReviewReport",
     "ReviewCase", "CasePattern",
     "SimPlatform", "SimExperiment", "SimRun",
-    "FileObject", "AgentRunLog", "ModelCallLog", "AuditLog",
+    "FileObject", "AgentRunLog", "ModelCallLog", "AuditLog", "SysSetting",
 ]

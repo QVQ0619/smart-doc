@@ -8,6 +8,7 @@ import {
   ExperimentOutlined,
   CommentOutlined,
   ProfileOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import type { ReactNode } from "react";
 
@@ -21,7 +22,8 @@ export type RouteKey =
   | "my-tasks"
   | "metric-inspect"
   | "opinion-review"
-  | "report-gen";
+  | "report-gen"
+  | "settings";
 
 export type MenuRole = "admin" | "reviewer";
 
@@ -48,7 +50,8 @@ export const MENU_GROUPS: MenuGroupDef[] = [
   { title: "审查报告生成", items: [{ key: "report-gen", label: "审查报告生成", icon: <FileDoneOutlined /> }] },
   { title: "审查台账", items: [{ key: "review-ledger", label: "审查台账", icon: <ProfileOutlined /> }] },
   { title: "规则库", items: [{ key: "rule-library", label: "规则库", icon: <DatabaseOutlined />, roles: ["admin"] }] },
-  // 关于流程置于最后
+  // 系统设置(管理员)与关于流程置于最后
+  { title: "系统设置", items: [{ key: "settings", label: "系统设置", icon: <SettingOutlined />, roles: ["admin"] }] },
   { title: "系统", items: [{ key: "about", label: "关于流程", icon: <InfoCircleOutlined /> }] },
 ];
 
