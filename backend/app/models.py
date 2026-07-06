@@ -495,9 +495,10 @@ class TaskReport(SQLModel, table=True):
     report_type: str                              # 见 routers/tasks.py REPORT_TYPES
     file_id: Optional[int] = _fk("file_object.id")
     file_name: Optional[str] = None
-    review_status: str = "pending"
+    review_status: str = "pending"   # pending→generated→countersigned→archived
     uploaded_by: Optional[int] = _bigint()
     uploaded_at: Optional[datetime] = _dt()
+    archived_at: Optional[datetime] = _dt()   # 终签归档时间
 
 
 class TaskRule(SQLModel, table=True):

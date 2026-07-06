@@ -80,7 +80,7 @@ export default function SideMenu() {
   }
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div
         style={{
           padding: "16px 20px",
@@ -92,15 +92,18 @@ export default function SideMenu() {
       >
         装备研制立项AI辅助审查评估系统
       </div>
-      <Menu
-        mode="inline"
-        selectedKeys={[selectedKey]}
-        openKeys={openKeys}
-        onOpenChange={(keys) => setOpenKeys(keys as string[])}
-        items={items}
-        style={{ borderInlineEnd: "none" }}
-        onClick={(info) => navigate({ name: info.key as RouteKey })}
-      />
+      {/* 菜单区占据剩余空间，把页脚顶到最底 */}
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+        <Menu
+          mode="inline"
+          selectedKeys={[selectedKey]}
+          openKeys={openKeys}
+          onOpenChange={(keys) => setOpenKeys(keys as string[])}
+          items={items}
+          style={{ borderInlineEnd: "none" }}
+          onClick={(info) => navigate({ name: info.key as RouteKey })}
+        />
+      </div>
       {user && (
         <div style={{ borderTop: "1px solid #f0f0f0" }}>
           {/* 用户名 + 退出登录 */}
@@ -125,11 +128,15 @@ export default function SideMenu() {
               <Button size="small" icon={<LogoutOutlined />} onClick={logout} aria-label="退出登录" />
             </Tooltip>
           </div>
-          {/* 灰线 + 折叠菜单(置于最下) */}
-          <div style={{ padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
-            <Button block size="small" icon={<MenuFoldOutlined />} onClick={toggle}>
-              折叠菜单
-            </Button>
+          {/* 灰线 + 折叠(无按钮边框,置于最下) */}
+          <div style={{ borderTop: "1px solid #f0f0f0" }}>
+            <Button
+              type="text"
+              icon={<MenuFoldOutlined />}
+              onClick={toggle}
+              aria-label="折叠菜单"
+              style={{ width: "100%", height: 40, color: "#8c8c8c", borderRadius: 0 }}
+            />
           </div>
         </div>
       )}
