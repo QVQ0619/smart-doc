@@ -11,7 +11,12 @@ vi.mock("@blade-hq/agent-kit/react", () => ({
 const toast = vi.hoisted(() => ({ warning: vi.fn(), success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-import { pushRuleDocSkill, pushMaterialDocSkill, pushReviewSkill } from "./sessionSkill";
+import {
+  pushRuleDocSkill,
+  pushMaterialDocSkill,
+  pushReviewSkill,
+  assembleDropInSkills,
+} from "./sessionSkill";
 
 type FileEntry = { path: string; content: string };
 
@@ -84,4 +89,62 @@ test("pushReviewSkill 推送 review-package", async () => {
   await pushReviewSkill("sess-1");
   const names = uploadSessionSkill.mock.calls.map((c) => (c[1] as { name: string }).name);
   expect(names).toContain("local/review-package");
+});
+
+// --- Drop-in 自动扫描（方案 A）：纯函数 assembleDropInSkills ---
+
+test("assembleDropInSkills: 识别根目录有 SKILL.md 的自包含技能，含相对路径与 local/ 命名", () => {
+  const raw = {
+    "../../blade/skills/fund-rule-extract/SKILL.md": "md",
+    "../../blade/skills/fund-rule-extract/tools.py": "py",
+    "../../blade/skills/fund-rule-extract/resources/x.json": "{}",
+  };
+  const skills = assembleDropInSkills(raw);
+  expect(skills).toHaveLength(1);
+  expect(skills[0].name).toBe("local/fund-rule-extract");
+  // 文件按相对路径的码点序（大写在前）：SKILL.md < resources/x.json < tools.py
+  expect(skills[0].files.map((f) => f.path)).toEqual([
+    "SKILL.md",
+    "resources/x.json",
+    "tools.py",
+  ]);
+  expect(skills[0].files.find((f) => f.path === "tools.py")!.content).toBe("py");
+});
+
+test("assembleDropInSkills: 旧技能(SKILL.md 在 versions/ 深层)与 shared/ 被排除", () => {
+  const raw = {
+    "../../blade/skills/save-rule-doc/metadata.json": "{}",
+    "../../blade/skills/save-rule-doc/versions/1.0.0/SKILL.md": "md",
+    "../../blade/skills/shared/helpers/smart_doc_add.py": "py",
+  };
+  expect(assembleDropInSkills(raw)).toEqual([]);
+});
+
+test("assembleDropInSkills: 文件夹名非法 → 跳过并 toast.warning", () => {
+  const raw = {
+    "../../blade/skills/Bad_Name/SKILL.md": "md",
+    "../../blade/skills/Bad_Name/tools.py": "py",
+  };
+  expect(assembleDropInSkills(raw)).toEqual([]);
+  expect(toast.warning).toHaveBeenCalled();
+});
+
+test("assembleDropInSkills: 跳过 . 开头的文件(如 .skill_id)，但仍识别该技能", () => {
+  const raw = {
+    "../../blade/skills/foo/SKILL.md": "md",
+    "../../blade/skills/foo/.skill_id": "foo",
+    "../../blade/skills/foo/tools.py": "py",
+  };
+  const skills = assembleDropInSkills(raw);
+  expect(skills).toHaveLength(1);
+  expect(skills[0].files.map((f) => f.path)).toEqual(["SKILL.md", "tools.py"]);
+});
+
+test("assembleDropInSkills: 多个 drop-in 技能按文件夹名排序输出", () => {
+  const raw = {
+    "../../blade/skills/zeta/SKILL.md": "z",
+    "../../blade/skills/alpha/SKILL.md": "a",
+  };
+  const skills = assembleDropInSkills(raw);
+  expect(skills.map((s) => s.name)).toEqual(["local/alpha", "local/zeta"]);
 });

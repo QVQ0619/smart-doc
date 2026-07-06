@@ -8,7 +8,7 @@ import { useSessionStore } from "@blade-hq/agent-kit/react";
 import { bladeClient } from "../blade/client";
 import { hasToken, getSolutionId, getBizRoleId } from "../blade/config";
 import { useChatCollapseStore } from "../store/useChatCollapseStore";
-import { pushRuleDocSkill, pushMaterialDocSkill, pushReviewSkill } from "../blade/sessionSkill";
+import { pushRuleDocSkill, pushMaterialDocSkill, pushReviewSkill, pushDropInSkills } from "../blade/sessionSkill";
 
 export default function ChatPanel() {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -49,6 +49,9 @@ export default function ChatPanel() {
       void pushRuleDocSkill(result.session_id);
       void pushMaterialDocSkill(result.session_id);
       void pushReviewSkill(result.session_id);
+      // 自动推送 blade/skills/ 下所有自包含 drop-in 技能（根目录含 SKILL.md）。
+      // 新增此类技能只需拖文件夹进 blade/skills/，无需再改本文件。
+      void pushDropInSkills(result.session_id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

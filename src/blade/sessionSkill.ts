@@ -113,3 +113,79 @@ export async function pushReviewSkill(sessionId: string): Promise<void> {
     { path: "scripts/api_key.txt", content: apiKey ?? "" },
   ]);
 }
+
+// ============================================================================
+// Drop-in 自包含技能自动扫描（方案 A）
+//
+// 约定：`blade/skills/<name>/` **根目录**存在 `SKILL.md` 即视为「自包含 drop-in
+// 技能」，自动以 `local/<name>` 推送。skill 需要的一切文件都放在自己文件夹内。
+// - 旧技能的 SKILL.md 在 `versions/1.0.0/` 深层（根目录无 SKILL.md）→ 天然被排除，
+//   仍由上面的 pushRuleDocSkill/pushMaterialDocSkill/pushReviewSkill 硬编码推送。
+// - `shared/`（无根 SKILL.md）→ 排除。
+// 新增/更新一个自包含技能 = 拖文件夹进 blade/skills/，无需改本文件。
+// ============================================================================
+
+const SKILLS_PREFIX = "blade/skills/";
+const DROP_IN_NAME_RE = /^[a-z0-9-]+$/;
+
+type DropInSkill = { name: `${string}/${string}`; files: FileEntry[] };
+
+/**
+ * 从 Vite `import.meta.glob` 的 { 路径 -> 原始内容 } 映射，组装出所有「自包含
+ * drop-in 技能」的推送载荷。**纯函数**（除非法命名会 toast.warning），便于单测。
+ *
+ * 判别规则：某文件夹内存在相对路径正好等于 `SKILL.md` 的文件（即根目录 SKILL.md）
+ * 才算 drop-in 技能。文件夹名须匹配 `^[a-z0-9-]+$`，否则跳过。以 `.` 开头的文件
+ * （如 `.skill_id`）被过滤不推送。产出按文件夹名码点序排序，保证顺序确定。
+ */
+export function assembleDropInSkills(raw: Record<string, string>): DropInSkill[] {
+  // 按文件夹名归组：folder -> [{ rel, content }]
+  const groups = new Map<string, { rel: string; content: string }[]>();
+  for (const [absPath, content] of Object.entries(raw)) {
+    const idx = absPath.indexOf(SKILLS_PREFIX);
+    if (idx < 0) continue;
+    const tail = absPath.slice(idx + SKILLS_PREFIX.length); // "<folder>/<rel...>"
+    const slash = tail.indexOf("/");
+    if (slash < 0) continue; // 直接位于 skills/ 下的文件，忽略
+    const folder = tail.slice(0, slash);
+    const rel = tail.slice(slash + 1);
+    if (!rel) continue;
+    if (rel.split("/").some((seg) => seg.startsWith("."))) continue; // 跳过 .skill_id 等
+    const arr = groups.get(folder) ?? [];
+    arr.push({ rel, content });
+    groups.set(folder, arr);
+  }
+
+  const result: DropInSkill[] = [];
+  for (const folder of [...groups.keys()].sort()) {
+    const arr = groups.get(folder)!;
+    if (!arr.some((f) => f.rel === "SKILL.md")) continue; // 非 drop-in（旧技能/shared 等）
+    if (!DROP_IN_NAME_RE.test(folder)) {
+      toast.warning(`跳过技能：文件夹名 "${folder}" 非法（须小写字母/数字/连字符）`);
+      continue;
+    }
+    const files = arr
+      .slice()
+      .sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0))
+      .map((f) => ({ path: f.rel, content: f.content }));
+    result.push({ name: `local/${folder}` as `${string}/${string}`, files });
+  }
+  return result;
+}
+
+// 构建期展开：扫描 blade/skills 下所有文件为原始文本。
+const DROP_IN_RAW = import.meta.glob("../../blade/skills/**/*", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+/**
+ * 推送所有自动发现的自包含 drop-in 技能到会话（agent 沙箱）。
+ * best-effort：单个失败只 toast.warning（在 pushOne 内），不抛出阻断聊天。
+ */
+export async function pushDropInSkills(sessionId: string): Promise<void> {
+  for (const skill of assembleDropInSkills(DROP_IN_RAW)) {
+    await pushOne(sessionId, skill.name, skill.files);
+  }
+}

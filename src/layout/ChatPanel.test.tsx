@@ -34,6 +34,7 @@ vi.mock("../blade/sessionSkill", () => ({
   pushRuleDocSkill: vi.fn(),
   pushMaterialDocSkill: vi.fn(),
   pushReviewSkill: vi.fn(),
+  pushDropInSkills: vi.fn(),
 }));
 
 import ChatPanel from "./ChatPanel";
