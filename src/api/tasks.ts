@@ -191,3 +191,13 @@ export async function fetchReportBlobUrl(taskId: number, reportId: number): Prom
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return URL.createObjectURL(await res.blob());
 }
+
+// 取报告原文件(带鉴权),供推送到 AI 会话工作区(开始审查)等场景使用
+export async function fetchReportFile(taskId: number, reportId: number, fileName: string): Promise<File> {
+  const res = await fetch(`/api/tasks/${taskId}/reports/${reportId}/download`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  return new File([blob], fileName, { type: blob.type });
+}
