@@ -6,6 +6,11 @@ import MaterialLibrary from "./MaterialLibrary";
 import * as api from "../api/materials";
 import * as batchesApi from "../api/batches";
 
+// DocxPreview 真渲染依赖 docx-preview + fetch,jsdom 里 mock 成占位组件
+vi.mock("./DocxPreview", () => ({
+  default: ({ name }: { name: string }) => <div data-testid="docx-preview">{name}</div>,
+}));
+
 function renderWithQuery(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
@@ -57,7 +62,7 @@ describe("MaterialLibrary", () => {
     expect(globalPkgSpy).not.toHaveBeenCalled();
   });
 
-  it("展开文件列表点击查看原文件→预览弹窗出现(docx 回退)", async () => {
+  it("展开文件列表点击查看原文件→预览弹窗出现(docx 在线预览)", async () => {
     vi.spyOn(api, "listMaterialPackages").mockResolvedValue([
       { package_id: 3, created_at: null, file_count: 1,
         files: [{ material_file_id: 9, file_name: "申请书.docx", material_category: "application_form",
@@ -72,9 +77,10 @@ describe("MaterialLibrary", () => {
     expandBtn.click();
     // 等文件行中"查看原文件"出现
     await waitFor(() => expect(screen.getByText("查看原文件")).toBeInTheDocument());
-    // 点击查看原文件（申请书.docx → docx 回退无法预览）
+    // 点击查看原文件（申请书.docx → DocxPreview 在线预览,已 mock 成占位）
     await userEvent.click(screen.getByText("查看原文件"));
-    await waitFor(() => expect(screen.getByText(/暂不支持在线预览/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("docx-preview")).toBeInTheDocument());
+    expect(screen.queryByText(/暂不支持在线预览/)).not.toBeInTheDocument();
     expect(document.body.querySelector("iframe")).toBeNull();
   });
 });

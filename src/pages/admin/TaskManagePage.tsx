@@ -83,10 +83,6 @@ export default function TaskManagePage() {
       message.error("请至少上传一份报告，不能创建空任务");
       return;
     }
-    if (selRules.length === 0) {
-      message.error("请从规则库选择至少一条审核规则");
-      return;
-    }
     const typed = staged.map((f) => ({ f, type: matchReportType(f.name) }));
     const bad = typed.filter((t) => !t.type);
     if (bad.length) {
@@ -283,7 +279,7 @@ export default function TaskManagePage() {
           <Form.Item name="task_no" label="任务编号（可选，留空自动生成）">
             <Input placeholder="留空自动生成 RTxxxxx" />
           </Form.Item>
-          <Form.Item label="审核规则（从规则库选择，必选）" required>
+          <Form.Item label="审核规则（从规则库选择，可选）">
             <Select
               mode="multiple"
               placeholder="选择用于审核本任务的规则"

@@ -182,14 +182,22 @@ export function isDeletable(status: string): boolean {
   return status === "created" || status === "done";
 }
 
-// 报告下载/预览端点需带鉴权头,故用 fetch 取 blob 再打开(不能直接 <a href>)。
-export async function openReport(taskId: number, reportId: number): Promise<void> {
+// 报告下载/预览端点需带鉴权头,不能把 API 路径直接塞给 <iframe>/<a href>,
+// 先 fetch 成 blob 造 objectURL 交给 FilePreviewModal。调用方关闭预览时负责 revoke。
+export async function fetchReportBlobUrl(taskId: number, reportId: number): Promise<string> {
+  const res = await fetch(`/api/tasks/${taskId}/reports/${reportId}/download`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return URL.createObjectURL(await res.blob());
+}
+
+// 取报告原文件(带鉴权),供推送到 AI 会话工作区(开始审查)等场景使用
+export async function fetchReportFile(taskId: number, reportId: number, fileName: string): Promise<File> {
   const res = await fetch(`/api/tasks/${taskId}/reports/${reportId}/download`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  window.open(url, "_blank");
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return new File([blob], fileName, { type: blob.type });
 }
