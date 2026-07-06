@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card, Select, Typography, Space, Button, Tag, message, Row, Col, Empty } from "antd";
-import { FileAddOutlined, EditOutlined, SafetyCertificateOutlined, FileTextOutlined } from "@ant-design/icons";
+import { FileAddOutlined, EditOutlined, SafetyCertificateOutlined, FileTextOutlined, DownloadOutlined } from "@ant-design/icons";
 import {
-  listTasks, listMyTasks, getTask, reviewStep,
+  listTasks, listMyTasks, getTask, reviewStep, downloadReport,
   type Task, type TaskDetail, type TaskReport,
 } from "../../api/tasks";
 import { useReportPreview } from "../../components/useReportPreview";
@@ -121,16 +121,33 @@ export default function ReportGenPage() {
                         终签归档
                       </Button>
                     </Space>
-                    <Button
-                      type="link"
-                      size="small"
-                      icon={<FileTextOutlined />}
-                      style={{ paddingLeft: 0 }}
-                      disabled={!r.uploaded}
-                      onClick={() => taskId != null && openPreview(taskId, r)}
-                    >
-                      查看原始报告
-                    </Button>
+                    <Space size="middle">
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<FileTextOutlined />}
+                        style={{ paddingLeft: 0 }}
+                        disabled={!r.uploaded}
+                        onClick={() => taskId != null && openPreview(taskId, r)}
+                      >
+                        查看审查报告
+                      </Button>
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<DownloadOutlined />}
+                        style={{ paddingLeft: 0 }}
+                        disabled={!r.uploaded}
+                        onClick={() =>
+                          taskId != null &&
+                          downloadReport(taskId, r.id, r.file_name || `${r.report_name}审查报告`).catch((e) =>
+                            message.error(e instanceof Error ? e.message : "下载失败"),
+                          )
+                        }
+                      >
+                        下载报告
+                      </Button>
+                    </Space>
                   </Space>
                 </Card>
               </Col>

@@ -201,3 +201,15 @@ export async function fetchReportFile(taskId: number, reportId: number, fileName
   const blob = await res.blob();
   return new File([blob], fileName, { type: blob.type });
 }
+
+// 下载审查报告文件(鉴权取 blob → 触发 <a download>)。与站内预览分开,给"直接下载"用。
+export async function downloadReport(taskId: number, reportId: number, fileName: string): Promise<void> {
+  const url = await fetchReportBlobUrl(taskId, reportId);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName || `report_${reportId}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
