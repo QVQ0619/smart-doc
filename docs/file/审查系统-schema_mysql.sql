@@ -35,6 +35,7 @@ CREATE TABLE sys_user (                                        -- 5.2 用户【+
   id                BIGINT AUTO_INCREMENT PRIMARY KEY,
   username          VARCHAR(64) NOT NULL,
   display_name      VARCHAR(64) NULL,
+  password_hash     VARCHAR(255) NULL,
   org_id            BIGINT NULL,
   secrecy_clearance VARCHAR(8)  NOT NULL DEFAULT '内部',
   status            VARCHAR(16) NOT NULL DEFAULT 'active',
