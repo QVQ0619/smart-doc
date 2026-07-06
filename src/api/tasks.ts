@@ -13,6 +13,7 @@ export interface TaskReport {
   file_name: string | null;
   review_status: string;
   uploaded: boolean;
+  archived: boolean;
 }
 
 export interface Task {
@@ -93,6 +94,23 @@ export function distributeTask(taskId: number, assigneeId: number): Promise<Task
 
 export function listMyTasks(): Promise<Task[]> {
   return fetch("/api/my/tasks", { headers: authHeaders() }).then((r) => handle<Task[]>(r));
+}
+
+// 审查报告步骤:generate(报告生成) → countersign(会签) → archive(终签归档)
+export function reviewStep(taskId: number, reportId: number, step: "generate" | "countersign" | "archive"): Promise<TaskReport> {
+  return fetch(`/api/tasks/${taskId}/reports/${reportId}/review-step`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ step }),
+  }).then((r) => handle<TaskReport>(r));
+}
+
+export interface LedgerTask extends Task {
+  archived_reports: TaskReport[];
+}
+
+export function listLedger(): Promise<LedgerTask[]> {
+  return fetch("/api/ledger", { headers: authHeaders() }).then((r) => handle<LedgerTask[]>(r));
 }
 
 export interface Overview {
