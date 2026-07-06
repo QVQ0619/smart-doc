@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card, Typography, Button, Space, Tag, message, Row, Col, Divider, Alert, Tooltip } from "antd";
 import { FileTextOutlined } from "@ant-design/icons";
-import { getTask, openReport, type TaskDetail } from "../../api/tasks";
+import { getTask, type TaskDetail } from "../../api/tasks";
+import { useReportPreview } from "../../components/useReportPreview";
 import { useRouteStore } from "../../store/useRouteStore";
 import { useAuthStore } from "../../store/useAuthStore";
 
@@ -16,6 +17,7 @@ const REVIEW_BUTTONS: { type: string; label: string }[] = [
 
 export default function TaskReviewPage({ taskId, taskName }: { taskId: number; taskName: string }) {
   const [detail, setDetail] = useState<TaskDetail | null>(null);
+  const { openPreview, previewModal } = useReportPreview();
   const navigate = useRouteStore((s) => s.navigate);
   const user = useAuthStore((s) => s.user);
 
@@ -70,9 +72,7 @@ export default function TaskReviewPage({ taskId, taskName }: { taskId: number; t
                     <Button
                       icon={<FileTextOutlined />}
                       disabled={!rep?.uploaded}
-                      onClick={() =>
-                        rep && openReport(taskId, rep.id).catch((e) => message.error(e instanceof Error ? e.message : "打开失败"))
-                      }
+                      onClick={() => rep && openPreview(taskId, rep)}
                     >
                       查看原始报告
                     </Button>
@@ -83,6 +83,7 @@ export default function TaskReviewPage({ taskId, taskName }: { taskId: number; t
           );
         })}
       </Row>
+      {previewModal}
     </div>
   );
 }

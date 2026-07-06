@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Card, Select, Typography, Space, Button, Tag, message, Row, Col, Empty } from "antd";
 import { FileAddOutlined, EditOutlined, SafetyCertificateOutlined, FileTextOutlined } from "@ant-design/icons";
 import {
-  listTasks, listMyTasks, getTask, reviewStep, openReport,
+  listTasks, listMyTasks, getTask, reviewStep,
   type Task, type TaskDetail, type TaskReport,
 } from "../../api/tasks";
+import { useReportPreview } from "../../components/useReportPreview";
 import { useAuthStore } from "../../store/useAuthStore";
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -20,6 +21,7 @@ export default function ReportGenPage() {
   const [taskId, setTaskId] = useState<number | undefined>();
   const [detail, setDetail] = useState<TaskDetail | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
+  const { openPreview, previewModal } = useReportPreview();
 
   useEffect(() => {
     (async () => {
@@ -125,9 +127,7 @@ export default function ReportGenPage() {
                       icon={<FileTextOutlined />}
                       style={{ paddingLeft: 0 }}
                       disabled={!r.uploaded}
-                      onClick={() =>
-                        openReport(taskId, r.id).catch((e) => message.error(e instanceof Error ? e.message : "打开失败"))
-                      }
+                      onClick={() => taskId != null && openPreview(taskId, r)}
                     >
                       查看原始报告
                     </Button>
@@ -138,6 +138,7 @@ export default function ReportGenPage() {
           })}
         </Row>
       )}
+      {previewModal}
     </div>
   );
 }
