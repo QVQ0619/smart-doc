@@ -21,6 +21,7 @@ import ReviewLedgerPage from "./pages/ledger/ReviewLedgerPage";
 import MyTasksPage from "./pages/reviewer/MyTasksPage";
 import TaskReviewPage from "./pages/reviewer/TaskReviewPage";
 import ReportGenPage from "./pages/reviewer/ReportGenPage";
+import PackageReviewPage from "./pages/reviewer/PackageReviewPage";
 import SystemSettingsPage from "./pages/settings/SystemSettingsPage";
 
 function renderMain(n: Nav): ReactNode {
@@ -49,6 +50,8 @@ function renderMain(n: Nav): ReactNode {
       return <SystemSettingsPage />;
     case "task-review":
       return <TaskReviewPage taskId={n.taskId} taskName={n.taskName} />;
+    case "package-review":
+      return <PackageReviewPage packageId={n.packageId} />;
     case "batch-detail":
       return <BatchDetailPage batchId={n.batchId} batchTitle={n.batchTitle} />;
     case "rule-detail":

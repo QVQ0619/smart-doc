@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Card, Select, Typography, Space, Button, Tag, message, Row, Col, Empty } from "antd";
-import { FileAddOutlined, EditOutlined, SafetyCertificateOutlined, FileTextOutlined, DownloadOutlined } from "@ant-design/icons";
+import { FileAddOutlined, EditOutlined, SafetyCertificateOutlined, FileTextOutlined, ProfileOutlined } from "@ant-design/icons";
 import {
-  listTasks, listMyTasks, getTask, reviewStep, downloadReport,
+  listTasks, listMyTasks, getTask, reviewStep,
   type Task, type TaskDetail, type TaskReport,
 } from "../../api/tasks";
 import { useReportPreview } from "../../components/useReportPreview";
+import { useRouteStore } from "../../store/useRouteStore";
 import { useAuthStore } from "../../store/useAuthStore";
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -22,6 +23,7 @@ export default function ReportGenPage() {
   const [detail, setDetail] = useState<TaskDetail | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const { openPreview, previewModal } = useReportPreview();
+  const navigate = useRouteStore((s) => s.navigate);
 
   useEffect(() => {
     (async () => {
@@ -125,27 +127,21 @@ export default function ReportGenPage() {
                       <Button
                         type="link"
                         size="small"
-                        icon={<FileTextOutlined />}
+                        icon={<ProfileOutlined />}
                         style={{ paddingLeft: 0 }}
-                        disabled={!r.uploaded}
-                        onClick={() => taskId != null && openPreview(taskId, r)}
+                        onClick={() => navigate({ name: "package-review" })}
                       >
                         查看审查报告
                       </Button>
                       <Button
                         type="link"
                         size="small"
-                        icon={<DownloadOutlined />}
+                        icon={<FileTextOutlined />}
                         style={{ paddingLeft: 0 }}
                         disabled={!r.uploaded}
-                        onClick={() =>
-                          taskId != null &&
-                          downloadReport(taskId, r.id, r.file_name || `${r.report_name}审查报告`).catch((e) =>
-                            message.error(e instanceof Error ? e.message : "下载失败"),
-                          )
-                        }
+                        onClick={() => taskId != null && openPreview(taskId, r)}
                       >
-                        下载报告
+                        查看原始报告
                       </Button>
                     </Space>
                   </Space>

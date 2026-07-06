@@ -5,7 +5,8 @@ export type Nav =
   | { name: RouteKey }
   | { name: "batch-detail"; batchId: number; batchTitle: string }
   | { name: "rule-detail"; docId: number; docTitle: string; batchId?: number; batchTitle?: string }
-  | { name: "task-review"; taskId: number; taskName: string };
+  | { name: "task-review"; taskId: number; taskName: string }
+  | { name: "package-review"; packageId?: number };
 
 interface RouteState {
   nav: Nav;
