@@ -98,7 +98,7 @@ fi
 # ── 增量迁移（幂等；与 docker 镜像 entrypoint 行为一致）。DB 没起时给出
 #    明确提示并终止，避免 uvicorn 起来后首个请求才报错让人困惑。──
 echo "Applying idempotent DB migrations..."
-if ! (cd "$ROOT_DIR/backend" && "$VENV_DIR/bin/python" scripts/apply_auth_migration.py && "$VENV_DIR/bin/python" scripts/apply_task_migration.py); then
+if ! (cd "$ROOT_DIR/backend" && "$VENV_DIR/bin/python" scripts/apply_auth_migration.py && "$VENV_DIR/bin/python" scripts/apply_task_migration.py && "$VENV_DIR/bin/python" scripts/apply_settings_migration.py); then
   echo "FATAL: 数据库不可达或迁移失败。请先启动 MySQL(可用: docker compose -f cicd/docker-compose.yaml up -d mysql)，或检查 SMART_DATABASE_URL。" >&2
   exit 1
 fi

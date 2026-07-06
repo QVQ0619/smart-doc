@@ -18,19 +18,20 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: var(--menu-col, 220px) 1fr var(--chat-col, 380px);
+  /* 右栏对话助手至少占 1/3 屏宽(窄屏兜底 380px) */
+  grid-template-columns: var(--menu-col, 220px) 1fr var(--chat-col, max(380px, 33.33vw));
   height: 100vh;
   overflow: hidden;
 }
 
+/* 折叠态:icon-only 菜单(对齐 blade-oauth 的 collapsedWidth) */
 .app-shell--menu-collapsed {
-  --menu-col: 48px;
+  --menu-col: 64px;
 }
-
 
 .app-shell__menu {
   height: 100vh;
-  overflow-y: auto;
+  overflow: hidden;
   border-right: 1px solid #e5e6eb;
   background: #ffffff;
 }
@@ -74,18 +75,26 @@ body {
   font-size: 13px;
 }
 
-.menu-rail {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
+/* ── 左侧导航(白色主题,对齐 blade-oauth AdminLayout)── */
+
+.side-user-trigger {
+  transition: background 0.2s;
 }
 
-.menu-rail__label {
-  writing-mode: vertical-rl;
-  letter-spacing: 2px;
-  color: #86909c;
-  font-size: 13px;
+.side-user-trigger:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.side-collapse-toggle {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  cursor: pointer;
+  color: #8c8c8c;
+  transition: color 0.2s;
+}
+
+.side-collapse-toggle:hover {
+  color: #1f2329;
 }

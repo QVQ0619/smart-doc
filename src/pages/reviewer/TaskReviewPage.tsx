@@ -3,6 +3,7 @@ import { Card, Typography, Button, Space, Tag, message, Row, Col, Divider, Alert
 import { FileTextOutlined } from "@ant-design/icons";
 import { useSessionStore, useChat, sessionsApi, buildMessageContent } from "@blade-hq/agent-kit/react";
 import { getTask, fetchReportFile, type TaskDetail, type TaskReport } from "../../api/tasks";
+import { getReviewPromptTemplate, renderReviewPrompt } from "../../api/settings";
 import { useReportPreview } from "../../components/useReportPreview";
 import { useRouteStore } from "../../store/useRouteStore";
 import { useAuthStore } from "../../store/useAuthStore";
@@ -47,12 +48,10 @@ export default function TaskReviewPage({ taskId, taskName }: { taskId: number; t
       const file = await fetchReportFile(taskId, rep.id, name);
       const { uploaded } = await sessionsApi.uploadFiles(activeSessionId, ".", [{ file, name }]);
       if (uploaded.length === 0) throw new Error("文件推送到对话失败");
-      send(
-        buildMessageContent(
-          `请开始「${label}」：待审报告《${name}》已上传到会话工作区，请阅读该文件并依据审查规则开展审查，输出审查意见。（任务：${taskName}）`,
-          [{ kind: "file", name, uploadedPath: uploaded[0] }],
-        ),
-      );
+      // 审查指令用「系统设置」里配置的提示词模板(未配置回退默认)
+      const template = await getReviewPromptTemplate();
+      const prompt = renderReviewPrompt(template, { reviewLabel: label, fileName: name, taskName });
+      send(buildMessageContent(prompt, [{ kind: "file", name, uploadedPath: uploaded[0] }]));
       message.success("报告已推送到右侧对话，审查已发起");
     } catch (e) {
       message.error(e instanceof Error ? e.message : "发起审查失败");

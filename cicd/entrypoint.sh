@@ -7,6 +7,7 @@ set -e
 if [ "${SMART_AUTO_MIGRATE:-true}" = "true" ]; then
     python scripts/apply_auth_migration.py
     python scripts/apply_task_migration.py
+    python scripts/apply_settings_migration.py
 fi
 
 # 初始账号（admin/admin123 等）仅在显式开启时种入，避免生产误留默认口令
