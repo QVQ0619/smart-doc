@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # 简单登录:签名 token 的密钥与有效期(分钟)。默认内置值,生产用 SMART_AUTH_SECRET 覆盖。
     auth_secret: str = "smart-doc-dev-secret-change-me"
     token_ttl_min: int = 720
+    # 前端构建产物目录（环境变量 SMART_FRONTEND_DIST_DIR）；非空且目录存在时
+    # 由后端托管前端静态文件（单镜像部署形态）。本地 dev 走 vite 代理，留空即可。
+    frontend_dist_dir: str = ""
 
     @property
     def max_upload_bytes(self) -> int:

@@ -1,0 +1,146 @@
+name: app-image-develop
+
+on:
+  push:
+    tags:
+      - "dev-*"
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "构建架构（默认 amd64；both 产出多架构 manifest）"
+        required: true
+        default: amd64
+        type: choice
+        options:
+          - amd64
+          - arm64
+          - both
+      reason:
+        description: "说明本次手动构建原因（可选）"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: app-image-develop-${{ github.ref }}-${{ inputs.arch || 'amd64' }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: smart-doc-review
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      main_tag: ${{ steps.meta.outputs.main_tag }}
+      platforms: ${{ steps.meta.outputs.platforms }}
+    steps:
+      - name: Validate dispatch branch
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "::error::app-image-develop only supports manual rebuilds from main."
+            exit 1
+          fi
+
+      - name: Prepare image metadata
+        id: meta
+        shell: bash
+        env:
+          ARCH: ${{ inputs.arch || 'amd64' }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          image="ghcr.io/${owner}/${IMAGE_NAME}"
+          run_suffix="${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+
+          # tag push 时用 tag 名作为镜像 tag，workflow_dispatch 时用 main-{run} 格式
+          if [ "${EVENT_NAME}" = "push" ]; then
+            main_tag="${GITHUB_REF_NAME}"
+          fi
+
+          case "${ARCH}" in
+            amd64)
+              platforms="linux/amd64"
+              main_tag="${main_tag:-main-${run_suffix}-amd64}"
+              ;;
+            arm64)
+              platforms="linux/arm64"
+              main_tag="${main_tag:-main-${run_suffix}-arm64}"
+              ;;
+            both)
+              platforms="linux/amd64,linux/arm64"
+              main_tag="${main_tag:-main-${run_suffix}}"
+              ;;
+            *)
+              echo "::error::Unknown arch ${ARCH}"
+              exit 1
+              ;;
+          esac
+          {
+            echo "image=${image}"
+            echo "main_tag=${main_tag}"
+            echo "platforms=${platforms}"
+          } >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: prepare
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare QEMU and Buildx
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --privileged --rm tonistiigi/binfmt:latest --install arm64 || true
+          docker buildx create --use
+          docker buildx inspect
+
+      - name: Login to GHCR
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform '${{ needs.prepare.outputs.platforms }}' \
+            --build-arg SMART_DOC_VERSION='${{ needs.prepare.outputs.main_tag }}' \
+            --build-arg VITE_APP_VERSION='${{ needs.prepare.outputs.main_tag }}' \
+            -f cicd/Dockerfile \
+            -t '${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.main_tag }}' \
+            --push \
+            .
+
+  notify:
+    needs:
+      - prepare
+      - build
+    if: always()
+    uses: blade-hq/.github/.github/workflows/feishu-release-notify.yml@main
+    with:
+      title: "【镜像构建】smart-doc-review"
+      event_key: ${{ needs.build.result == 'success' && 'main_image_succeeded' || needs.build.result == 'cancelled' && 'workflow_cancelled' || 'main_image_failed' }}
+      status_text: ${{ needs.build.result == 'success' && '构建成功' || needs.build.result == 'cancelled' && '构建取消' || '构建失败' }}
+      color: ${{ needs.build.result == 'success' && 'green' || needs.build.result == 'cancelled' && 'yellow' || 'red' }}
+      summary: ${{ needs.prepare.result != 'success' && '参数或分支校验未通过，未进入构建阶段。' || needs.build.result == 'success' && '镜像已推送到 GHCR。' || needs.build.result == 'cancelled' && '构建已取消。' || '构建失败。' }}
+      details: ${{ needs.prepare.result == 'success' && format('镜像：{0}:{1}', needs.prepare.outputs.image, needs.prepare.outputs.main_tag) || '未生成镜像 tag（prepare 阶段失败）。' }}
+      button_label: ${{ needs.build.result == 'failure' && '查看流水线' || '' }}
+      button_url: ${{ needs.build.result == 'failure' && format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) || '' }}
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    secrets:
+      FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
