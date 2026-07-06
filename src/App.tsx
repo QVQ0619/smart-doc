@@ -21,6 +21,7 @@ import ReviewLedgerPage from "./pages/ledger/ReviewLedgerPage";
 import MyTasksPage from "./pages/reviewer/MyTasksPage";
 import TaskReviewPage from "./pages/reviewer/TaskReviewPage";
 import ReportGenPage from "./pages/reviewer/ReportGenPage";
+import SystemSettingsPage from "./pages/settings/SystemSettingsPage";
 
 function renderMain(n: Nav): ReactNode {
   switch (n.name) {
@@ -44,6 +45,8 @@ function renderMain(n: Nav): ReactNode {
       return <ComingSoon title="审查意见研判" hint="汇总并研判各项审查意见。" />;
     case "report-gen":
       return <ReportGenPage />;
+    case "settings":
+      return <SystemSettingsPage />;
     case "task-review":
       return <TaskReviewPage taskId={n.taskId} taskName={n.taskName} />;
     case "batch-detail":
