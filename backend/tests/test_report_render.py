@@ -84,6 +84,27 @@ def test_render_pdf_is_pdf_and_contains_chinese_text():
     assert "机审初判" in text          # 审计留痕
 
 
+def test_render_pdf_escapes_untrusted_xml_special_chars():
+    ev = model.EvidenceRef(quote="预算 A<B & C>D 见附表", locator="申请书/第2页")
+    f = model.Finding(result_label="不通过", result_key="fail", rule_code="R-099",
+                      name="经费<50万 校验", severity=2, confidence=0.8,
+                      suggestion="应 <补充> 明细 & 说明", evidence=[ev], audit=None)
+    sec = model.Section(dimension_label="完整性", findings=[f])
+    stat = model.DimensionStat(dimension_label="完整性", passed=0, failed=1, attention=0)
+    rm = model.ReportModel(
+        title="立项审查报告",
+        cover=[("申报单位", "A&B<研究>所")],
+        conclusion_text="综合结论：需整改",
+        dimension_stats=[stat], sections=[sec], footer_note="系统生成")
+    data = render_pdf(rm)
+    assert isinstance(data, bytes) and data[:4] == b"%PDF"
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        text = "\n".join((page.extract_text() or "") for page in pdf.pages)
+    assert "A&B<研究>所" in text
+    assert "预算 A<B & C>D 见附表" in text
+    assert "应 <补充> 明细 & 说明" in text
+
+
 def test_package_zip_contains_all_files():
     data = package_zip({"a.docx": b"AAA", "b.pdf": b"%PDF-BB"})
     assert isinstance(data, bytes)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
@@ -46,22 +47,22 @@ def _styles() -> dict[str, ParagraphStyle]:
 
 def _finding_flowables(f: Finding, s: dict[str, ParagraphStyle]) -> list:
     out = []
-    badge = f'<font color="{result_color(f.result_key)}"><b>[{f.result_label}]</b></font>'
+    badge = f'<font color="{result_color(f.result_key)}"><b>[{escape(f.result_label)}]</b></font>'
     sev = f"    严重度：{f.severity}" if f.severity is not None else ""
-    out.append(Paragraph(f"{badge} {f.rule_code} {f.name}{sev}", s["body"]))
+    out.append(Paragraph(f"{badge} {escape(f.rule_code)} {escape(f.name)}{sev}", s["body"]))
     if f.confidence is not None:
         out.append(Paragraph(f"置信度：{f.confidence:.2f}", s["body"]))
-    out.append(Paragraph(f"审查意见：{f.suggestion or '—'}", s["body"]))
+    out.append(Paragraph(f"审查意见：{escape(f.suggestion) or '—'}", s["body"]))
     out.append(Paragraph("依据出处：", s["body"]))
     if f.evidence:
         for e in f.evidence:
-            out.append(Paragraph(f"· {e.locator}：{e.quote}", s["bullet"]))
+            out.append(Paragraph(f"· {escape(e.locator)}：{escape(e.quote)}", s["bullet"]))
     else:
         out.append(Paragraph("无", s["bullet"]))
     if f.audit is not None:
         out.append(Paragraph("—— 审计留痕 ——", s["audit"]))
-        out.append(Paragraph(f"机审初判：{f.audit.initial} → 人工改判：{f.audit.final}", s["audit"]))
-        out.append(Paragraph(f"处置说明：{f.audit.disposition or '—'}", s["audit"]))
+        out.append(Paragraph(f"机审初判：{escape(f.audit.initial)} → 人工改判：{escape(f.audit.final)}", s["audit"]))
+        out.append(Paragraph(f"处置说明：{escape(f.audit.disposition) or '—'}", s["audit"]))
     out.append(Spacer(1, 6))
     return out
 
@@ -73,21 +74,21 @@ def render_pdf(m: ReportModel) -> bytes:
 
     # ① 封面
     story.append(Spacer(1, 40 * mm))
-    story.append(Paragraph(m.title, s["title"]))
+    story.append(Paragraph(escape(m.title), s["title"]))
     story.append(Spacer(1, 16 * mm))
     for label, value in m.cover:
-        story.append(Paragraph(f"{label}：{value}", s["body"]))
+        story.append(Paragraph(f"{escape(label)}：{escape(value)}", s["body"]))
     story.append(Spacer(1, 20 * mm))
-    story.append(Paragraph(m.footer_note, s["footer"]))
+    story.append(Paragraph(escape(m.footer_note), s["footer"]))
     story.append(PageBreak())
 
     # ② 结论页
     story.append(Paragraph("一、审查结论", s["h1"]))
-    story.append(Paragraph(m.conclusion_text, s["body"]))
+    story.append(Paragraph(escape(m.conclusion_text), s["body"]))
     story.append(Spacer(1, 6))
     rows = [["维度", "通过", "不通过", "需关注"]]
     for st in m.dimension_stats:
-        rows.append([st.dimension_label, str(st.passed), str(st.failed), str(st.attention)])
+        rows.append([escape(st.dimension_label), str(st.passed), str(st.failed), str(st.attention)])
     tbl = Table(rows, hAlign="LEFT")
     tbl.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), _FONT),
@@ -100,7 +101,7 @@ def render_pdf(m: ReportModel) -> bytes:
     # ③ 分维度发现
     story.append(Paragraph("二、分维度审查发现", s["h1"]))
     for sec in m.sections:
-        story.append(Paragraph(sec.dimension_label, s["h2"]))
+        story.append(Paragraph(escape(sec.dimension_label), s["h2"]))
         for f in sec.findings:
             story.extend(_finding_flowables(f, s))
 
