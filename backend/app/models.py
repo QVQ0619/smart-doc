@@ -81,6 +81,7 @@ class SysUser(SQLModel, table=True):
     id: Optional[int] = _pk()
     username: str
     display_name: Optional[str] = None
+    password_hash: Optional[str] = None   # 简单登录用:salt$sha256,详见 security.py
     org_id: Optional[int] = _fk("org.id")
     secrecy_clearance: str = "内部"
     status: str = "active"
@@ -468,6 +469,46 @@ class ApplicationPackage(SQLModel, table=True):
 
 
 # =========================================================================== #
+# 5F+. 任务分发域（新增：管理员建任务→传1+4报告→分发→普通用户我的任务）
+# =========================================================================== #
+class ReviewTask(SQLModel, table=True):
+    __tablename__ = "review_task"
+    id: Optional[int] = _pk()
+    task_no: str
+    task_name: str
+    project_type_id: Optional[int] = _bigint()
+    secrecy_level_id: Optional[int] = _bigint()
+    status: str = "created"                      # created→distributed→reviewing→done
+    assignee_id: Optional[int] = _bigint(index=True)   # 受理人(普通用户 sys_user.id)
+    distributed_by: Optional[int] = _bigint()
+    distributed_at: Optional[datetime] = _dt()
+    package_id: Optional[int] = _bigint()        # 预留:桥接现有 application_package
+    created_by: Optional[int] = _bigint()
+    created_at: Optional[datetime] = _dt(nullable=False, now=True)
+    updated_at: Optional[datetime] = _dt(nullable=False, now=True)
+
+
+class TaskReport(SQLModel, table=True):
+    __tablename__ = "task_report"
+    id: Optional[int] = _pk()
+    task_id: int = _fk("review_task.id", nullable=False)
+    report_type: str                              # 见 routers/tasks.py REPORT_TYPES
+    file_id: Optional[int] = _fk("file_object.id")
+    file_name: Optional[str] = None
+    review_status: str = "pending"
+    uploaded_by: Optional[int] = _bigint()
+    uploaded_at: Optional[datetime] = _dt()
+
+
+class TaskRule(SQLModel, table=True):
+    __tablename__ = "task_rule"
+    id: Optional[int] = _pk()
+    task_id: int = _fk("review_task.id", nullable=False)
+    standard_doc_id: int = _fk("standard_doc.id", nullable=False)  # 规则库中的规则文件
+    created_at: Optional[datetime] = _dt(nullable=False, now=True)
+
+
+# =========================================================================== #
 # 5G. 材料解析 + 结构化审查对象域
 # =========================================================================== #
 class MaterialFile(SQLModel, table=True):
@@ -775,6 +816,7 @@ __all__ = [
     "SecrecyLevel", "SecurityQualLevel", "SecrecyQualMap", "ApplicationCode",
     "ResearchUnit", "ResearchPerson", "PersonHolding", "IntegrityRecord",
     "DeclaredProject", "ReviewBatch", "BatchRuleDoc", "ApplicationPackage",
+    "ReviewTask", "TaskReport", "TaskRule",
     "MaterialFile", "ParseSegment", "ExtractedField", "PackageMember",
     "PackageCoopUnit", "BudgetItem", "PackageAttachment",
     "ReviewRound", "RoundCheck", "CheckReviewAction", "FindingEvidence", "ReviewReport",

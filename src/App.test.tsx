@@ -32,7 +32,7 @@ vi.mock("./pages/library/RuleLibraryPage", () => ({
 }));
 
 beforeEach(() => {
-  useRouteStore.setState({ nav: { name: "home" } });
+  useRouteStore.setState({ nav: { name: "my-tasks" } });
 });
 
 test("默认渲染工作台页", async () => {

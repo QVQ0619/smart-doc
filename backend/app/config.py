@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # 写/变更端点的共享密钥（环境变量 SMART_API_KEY）；为空则不鉴权
     # （本地 dev/向后兼容），对外可达部署应设置以防匿名写/删业务库。
     api_key: str = ""
+    # 简单登录:签名 token 的密钥与有效期(分钟)。默认内置值,生产用 SMART_AUTH_SECRET 覆盖。
+    auth_secret: str = "smart-doc-dev-secret-change-me"
+    token_ttl_min: int = 720
 
     @property
     def max_upload_bytes(self) -> int:

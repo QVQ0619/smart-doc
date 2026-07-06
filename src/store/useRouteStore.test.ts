@@ -1,7 +1,7 @@
 import { useRouteStore } from "./useRouteStore";
 
 beforeEach(() => {
-  useRouteStore.setState({ nav: { name: "home" } });
+  useRouteStore.setState({ nav: { name: "my-tasks" } });
 });
 
 test("默认 nav.name 是 home", () => {
@@ -9,8 +9,8 @@ test("默认 nav.name 是 home", () => {
 });
 
 test("navigate 切换简单路由", () => {
-  useRouteStore.getState().navigate({ name: "review-new" });
-  expect(useRouteStore.getState().nav.name).toBe("review-new");
+  useRouteStore.getState().navigate({ name: "task-manage" });
+  expect(useRouteStore.getState().nav.name).toBe("task-manage");
 });
 
 test("navigate 携参 batch-detail", () => {

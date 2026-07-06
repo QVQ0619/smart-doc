@@ -119,7 +119,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   _bladeState.activeSessionId = "session-abc";
   // 重置路由至 home，避免测试间干扰
-  useRouteStore.setState({ nav: { name: "home" } });
+  useRouteStore.setState({ nav: { name: "my-tasks" } });
 
   vi.mocked(api.listStandardDocs).mockResolvedValue([sampleDoc] as never);
   vi.mocked(api.listRules).mockResolvedValue(sampleRules as never);

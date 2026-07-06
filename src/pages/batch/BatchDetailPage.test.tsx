@@ -89,7 +89,7 @@ function renderWithQuery(ui: React.ReactNode) {
 
 describe("BatchDetailPage", () => {
   beforeEach(() => {
-    useRouteStore.setState({ nav: { name: "home" } });
+    useRouteStore.setState({ nav: { name: "my-tasks" } });
     vi.spyOn(batchApi, "getBatchDetail").mockResolvedValue(mockDetail);
     vi.spyOn(configApi, "listConfigPackages").mockResolvedValue(
       mockConfigPackages,

@@ -4,12 +4,12 @@ import SideMenu from "./SideMenu";
 import { useRouteStore } from "../store/useRouteStore";
 
 beforeEach(() => {
-  useRouteStore.setState({ nav: { name: "home" } });
+  useRouteStore.setState({ nav: { name: "my-tasks" } });
 });
 
 test("渲染品牌名与全部菜单项", async () => {
   render(<SideMenu />);
-  await waitFor(() => expect(screen.getByText("立项审查AI辅助系统")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("装备研制立项AI辅助审查评估系统")).toBeInTheDocument());
   for (const label of [
     "工作台",
     "新建审查",
