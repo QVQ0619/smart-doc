@@ -1,4 +1,7 @@
+import io
+from docx import Document
 from app.reporting import model, styles
+from app.reporting.render_docx import render_docx
 
 
 def test_report_model_constructs_and_holds_fields():
@@ -30,3 +33,38 @@ def test_result_bucket_three_way():
     assert styles.result_bucket("fail") == "failed"
     assert styles.result_bucket("need_review") == "attention"
     assert styles.result_bucket("not_applicable") == "attention"
+
+
+def _sample_model():
+    ev = model.EvidenceRef(quote="申请人:张三", locator="申请书/第1页")
+    audit = model.AuditTrail(initial="通过", final="不通过", disposition="预算表缺失")
+    f_over = model.Finding(result_label="不通过", result_key="fail", rule_code="R-012",
+                           name="必须有预算表", severity=3, confidence=0.92,
+                           suggestion="未提供预算明细表，应补充。", evidence=[ev], audit=audit)
+    f_plain = model.Finding(result_label="通过", result_key="pass", rule_code="R-003",
+                            name="项目名称完整", severity=None, confidence=None,
+                            suggestion="", evidence=[], audit=None)
+    sec = model.Section(dimension_label="完整性", findings=[f_over, f_plain])
+    stat = model.DimensionStat(dimension_label="完整性", passed=1, failed=1, attention=0)
+    return model.ReportModel(
+        title="立项审查报告",
+        cover=[("项目名称", "示范科研项目"), ("申报单位", "某研究所"), ("审查结论", "需整改")],
+        conclusion_text="共审查规则 2 条，通过 1、不通过 1、需关注 0。综合结论：需整改",
+        dimension_stats=[stat], sections=[sec], footer_note="智能立项审查系统 生成")
+
+
+def test_render_docx_returns_readable_docx_with_key_text():
+    data = render_docx(_sample_model())
+    assert isinstance(data, bytes) and len(data) > 0
+    doc = Document(io.BytesIO(data))
+    text = "\n".join(p.text for p in doc.paragraphs)
+    table_text = "\n".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
+    whole = text + "\n" + table_text
+    assert "立项审查报告" in whole          # 标题
+    assert "示范科研项目" in whole          # 封面字段
+    assert "综合结论：需整改" in whole       # 结论段
+    assert "完整性" in whole                # 维度标题
+    assert "必须有预算表" in whole          # 发现名称
+    assert "未提供预算明细表" in whole       # 审查意见
+    assert "申请书/第1页" in whole          # 出处定位
+    assert "机审初判" in whole and "预算表缺失" in whole   # 审计留痕
