@@ -1,6 +1,27 @@
-from app.report_builder import assemble_report_model
+from app.report_builder import _clean_quote, assemble_report_model
 from app.reporting.model import EvidenceRef
 from app.schemas import CheckOut, EvidenceOut, ReviewResultOut, RoundOut
+
+
+def test_clean_quote_dedupes_repeated_table_cells_and_joins_rows():
+    raw = ("申请人信息 | 申请人信息 | 申请人信息 | 申请人信息\n"
+           "姓名 | 姓名 | 张　明 | 张　明 | 性别 | 性别")
+    out = _clean_quote(raw)
+    # 连续重复单元格折叠为一个；行间用 '；' 连
+    assert out == "申请人信息；姓名 | 张　明 | 性别"
+    # 不再包含原始的重复串
+    assert "申请人信息 | 申请人信息" not in out
+
+
+def test_clean_quote_truncates_long_text_with_ellipsis():
+    raw = "甲 | 乙 | 丙 | " + " | ".join(str(i) for i in range(100))
+    out = _clean_quote(raw, limit=20)
+    assert len(out) <= 21 and out.endswith("…")
+
+
+def test_clean_quote_empty_returns_dash():
+    assert _clean_quote("") == "—"
+    assert _clean_quote("   \n  ") == "—"
 
 
 def _check(**kw):

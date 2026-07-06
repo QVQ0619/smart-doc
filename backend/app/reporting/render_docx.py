@@ -29,7 +29,7 @@ def _add_finding(doc: Document, f: Finding) -> None:
     doc.add_paragraph("依据出处：")
     if f.evidence:
         for e in f.evidence:
-            doc.add_paragraph(f"· {e.locator}：{e.quote}", style="List Bullet")
+            doc.add_paragraph(f"· {e.locator}：{e.quote}")
     else:
         doc.add_paragraph("无")
     if f.audit is not None:

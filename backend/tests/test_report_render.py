@@ -74,6 +74,17 @@ def test_render_docx_returns_readable_docx_with_key_text():
     assert "机审初判" in whole and "预算表缺失" in whole   # 审计留痕
 
 
+def test_render_docx_evidence_line_not_list_bullet_style():
+    # 出处行不再用 Word 'List Bullet' 样式（避免与手写 '· ' 叠成双项目符号）
+    data = render_docx(_sample_model())
+    doc = Document(io.BytesIO(data))
+    ev_paras = [p for p in doc.paragraphs if "申请书/第1页" in p.text]
+    assert ev_paras, "应存在出处段落"
+    for p in ev_paras:
+        assert (p.style.name or "") != "List Bullet"
+        assert p.text.startswith("· ")   # 仍保留单一手写项目符号
+
+
 def test_render_pdf_is_pdf_and_contains_chinese_text():
     data = render_pdf(_sample_model())
     assert isinstance(data, bytes) and data[:4] == b"%PDF"

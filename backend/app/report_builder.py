@@ -17,6 +17,33 @@ from .schemas import CheckOut, EvidenceOut, ReviewResultOut
 TITLE = "立项审查报告"
 FOOTER = "智能立项审查系统 生成"
 
+QUOTE_LIMIT = 80
+
+
+def _clean_quote(text: str, limit: int = QUOTE_LIMIT) -> str:
+    """把 parse_segment 原文整理成适合报告的短引文。
+
+    表格段的 content_text 由 recognition._rows_to_text 生成：行内单元格用 ' | ' 连、
+    行间用 '\\n' 连，合并单元格会重复。这里按行拆、去掉空单元格与**连续重复**单元格、
+    行间改用 '；' 连，超长截断加 '…'，避免报告里出现又长又重复的表格拍平文本。
+    """
+    if not text or not text.strip():
+        return "—"
+    rows: list[str] = []
+    for line in text.split("\n"):
+        cells: list[str] = []
+        for cell in line.split(" | "):
+            cell = cell.strip()
+            if not cell or (cells and cells[-1] == cell):
+                continue  # 丢空单元格 + 去连续重复
+            cells.append(cell)
+        if cells:
+            rows.append(" | ".join(cells))
+    joined = "；".join(rows)
+    if len(joined) > limit:
+        joined = joined[:limit].rstrip() + "…"
+    return joined or "—"
+
 
 def _finding_of(c: CheckOut, resolve_evidence: Callable[[EvidenceOut], EvidenceRef]) -> Finding:
     audit = None
@@ -106,7 +133,7 @@ def build_report_model(db: Session, package_id: int) -> ReportModel:
         if e.segment_id is not None:
             seg = db.get(ParseSegment, e.segment_id)
             if seg is not None:
-                quote = (seg.content_text or "").strip()[:120] or "—"
+                quote = _clean_quote(seg.content_text or "")
                 mf = db.get(MaterialFile, seg.material_file_id) if seg.material_file_id else None
                 page = f"第{seg.page_no}页" if seg.page_no else ""
                 loc = f"{mf.file_name if mf else '材料'}{('/' + page) if page else ''}"
