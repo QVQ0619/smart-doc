@@ -65,6 +65,14 @@ with engine.begin() as c:
     c.execute(text(REVIEW_TASK))
     c.execute(text(TASK_REPORT))
     c.execute(text(TASK_RULE))
+    # 幂等:给 task_report 加 archived_at(终签归档时间)
+    has_col = c.execute(text(
+        "SELECT COUNT(*) FROM information_schema.columns "
+        "WHERE table_schema='smart' AND table_name='task_report' AND column_name='archived_at'"
+    )).scalar()
+    if not has_col:
+        c.execute(text("ALTER TABLE task_report ADD COLUMN archived_at DATETIME(3) NULL"))
+        print("added task_report.archived_at")
     n = c.execute(text("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='smart'")).scalar()
     has_rt = c.execute(text("SHOW TABLES LIKE 'review_task'")).first()
     has_tr = c.execute(text("SHOW TABLES LIKE 'task_report'")).first()

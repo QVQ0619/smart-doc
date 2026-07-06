@@ -55,6 +55,7 @@ class ReportOut(BaseModel):
     file_name: str | None = None
     review_status: str
     uploaded: bool
+    archived: bool = False
 
 
 class TaskOut(BaseModel):
@@ -86,6 +87,14 @@ class TaskCreateIn(BaseModel):
     rule_doc_ids: list[int] = []
 
 
+class ReviewStepIn(BaseModel):
+    step: str  # generate | countersign | archive
+
+
+class LedgerTaskOut(TaskOut):
+    archived_reports: list[ReportOut] = []
+
+
 class DistributeIn(BaseModel):
     assignee_id: int
 
@@ -110,7 +119,8 @@ def _reports(db: Session, task_id: int) -> list[TaskReport]:
 def _report_out(r: TaskReport) -> ReportOut:
     return ReportOut(
         id=r.id, report_type=r.report_type, report_name=REPORT_TYPE_MAP.get(r.report_type, r.report_type),
-        file_id=r.file_id, file_name=r.file_name, review_status=r.review_status, uploaded=r.file_id is not None,
+        file_id=r.file_id, file_name=r.file_name, review_status=r.review_status,
+        uploaded=r.file_id is not None, archived=r.review_status == "archived",
     )
 
 
@@ -298,6 +308,38 @@ def download_report(
     return FileResponse(path, filename=fo.file_name, media_type=media_type, content_disposition_type="inline")
 
 
+# --------------------------- 审查报告:生成→会签→终签归档 --------------------------- #
+STEP_TO_STATUS = {"generate": "generated", "countersign": "countersigned", "archive": "archived"}
+STEP_REQUIRES = {"generate": "pending", "countersign": "generated", "archive": "countersigned"}
+STEP_LABEL = {"generate": "报告生成", "countersign": "会签", "archive": "终签归档"}
+
+
+@router.post("/tasks/{task_id}/reports/{report_id}/review-step", response_model=ReportOut)
+def review_step(task_id: int, report_id: int, body: ReviewStepIn,
+                db: Session = Depends(get_session), me: SysUser = Depends(get_current_user)) -> ReportOut:
+    tr = db.get(TaskReport, report_id)
+    if tr is None or tr.task_id != task_id:
+        raise HTTPException(404, "报告不存在")
+    t = db.get(ReviewTask, task_id)
+    roles = get_user_roles(db, me.id)
+    is_admin = any(r in ("sys_admin", "research_admin") for r in roles)
+    if not is_admin and (t is None or t.assignee_id != me.id):
+        raise HTTPException(403, "无权操作此报告")
+    if body.step not in STEP_TO_STATUS:
+        raise HTTPException(422, "无效步骤")
+    if not tr.file_id:
+        raise HTTPException(400, "该报告尚未上传，无法生成/会签/归档")
+    if tr.review_status != STEP_REQUIRES[body.step]:
+        raise HTTPException(400, f"当前状态不允许「{STEP_LABEL[body.step]}」，请先完成上一步")
+    tr.review_status = STEP_TO_STATUS[body.step]
+    if body.step == "archive":
+        tr.archived_at = _now()
+    db.add(tr)
+    db.commit()
+    db.refresh(tr)
+    return _report_out(tr)
+
+
 # --------------------------- 管理员:受理分发(分发即受理) --------------------------- #
 @router.post("/tasks/{task_id}/distribute", response_model=TaskOut)
 def distribute_task(task_id: int, body: DistributeIn,
@@ -373,6 +415,25 @@ def my_tasks(db: Session = Depends(get_session), me: SysUser = Depends(get_curre
         select(ReviewTask).where(ReviewTask.assignee_id == me.id).order_by(ReviewTask.id.desc())
     ).scalars().all()
     return [_task_out(db, t) for t in tasks]
+
+
+# --------------------------- 审查台账:仅含终签归档报告的任务 --------------------------- #
+@router.get("/ledger", response_model=list[LedgerTaskOut])
+def ledger(db: Session = Depends(get_session), me: SysUser = Depends(get_current_user)) -> list[LedgerTaskOut]:
+    roles = get_user_roles(db, me.id)
+    is_admin = any(r in ("sys_admin", "research_admin") for r in roles)
+    stmt = select(ReviewTask).order_by(ReviewTask.id.desc())
+    if not is_admin:
+        stmt = select(ReviewTask).where(ReviewTask.assignee_id == me.id).order_by(ReviewTask.id.desc())
+    out: list[LedgerTaskOut] = []
+    for t in db.execute(stmt).scalars().all():
+        reps = _reports(db, t.id)
+        archived = [r for r in reps if r.review_status == "archived"]
+        if not archived:
+            continue
+        base = _task_out(db, t, reps)
+        out.append(LedgerTaskOut(**base.model_dump(), archived_reports=[_report_out(r) for r in archived]))
+    return out
 
 
 # --------------------------- 首页仪表盘统计 --------------------------- #
