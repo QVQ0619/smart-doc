@@ -1,7 +1,9 @@
 import io
+import pdfplumber
 from docx import Document
 from app.reporting import model, styles
 from app.reporting.render_docx import render_docx
+from app.reporting.render_pdf import render_pdf
 
 
 def test_report_model_constructs_and_holds_fields():
@@ -68,3 +70,13 @@ def test_render_docx_returns_readable_docx_with_key_text():
     assert "未提供预算明细表" in whole       # 审查意见
     assert "申请书/第1页" in whole          # 出处定位
     assert "机审初判" in whole and "预算表缺失" in whole   # 审计留痕
+
+
+def test_render_pdf_is_pdf_and_contains_chinese_text():
+    data = render_pdf(_sample_model())
+    assert isinstance(data, bytes) and data[:4] == b"%PDF"
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        text = "\n".join((page.extract_text() or "") for page in pdf.pages)
+    assert "立项审查报告" in text      # 标题（中文未乱码）
+    assert "必须有预算表" in text      # 发现名称
+    assert "机审初判" in text          # 审计留痕
