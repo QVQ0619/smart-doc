@@ -2,11 +2,11 @@
 # ║  smart-doc-review 镜像部署 compose                                          ║
 # ║  配合 cicd/Dockerfile 构建的单镜像（前端静态 + FastAPI 后端一体）。          ║
 # ║                                                                            ║
-# ║  用法（仓库根目录）：                                                        ║
-# ║    docker compose -f cicd/docker-compose.yaml up -d                        ║
-# ║  默认拉取 GHCR 流水线产物（.github/workflows/app-image-develop.yml，        ║
-# ║  推 dev-* tag 或手动触发产出）；本地构建：                                   ║
-# ║    docker compose -f cicd/docker-compose.yaml build                        ║
+# ║  用法：推荐通过 cicd/deploy.sh 部署（自动读 cicd/.env、建数据目录、          ║
+# ║  构建/拉取镜像并等待健康）。也可手动（仓库根目录）：                          ║
+# ║    docker compose --env-file cicd/.env -f cicd/docker-compose.yaml up -d   ║
+# ║  数据挂载到宿主机 ${SMART_DOC_DATA_DIR:-./data}（相对本 compose 文件），     ║
+# ║  mysql/ 放数据库，storage/ 放上传文件与生成的报告。                          ║
 # ║                                                                            ║
 # ║  与根目录 docker-compose.yml 的区别：根目录那份是本地开发全家桶              ║
 # ║  （含 blade-agent / skill-registry），这份只部署本应用镜像 + MySQL。         ║
@@ -26,7 +26,7 @@ services:
     ports:
       - "${HOST_MYSQL_PORT:-3306}:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - ${SMART_DOC_DATA_DIR:-./data}/mysql:/var/lib/mysql
       # 路径相对本 compose 文件；表结构由该 SQL 建立（应用不做 create_all）
       - ../docs/file/审查系统-schema_mysql.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
@@ -44,6 +44,13 @@ services:
     build:
       context: ..
       dockerfile: cicd/Dockerfile
+      args:
+        # Blade Agent 接入为 Vite 编译期注入，改动后需重新 build（deploy.sh 自动处理）。
+        # Token 会明文进镜像，仅限内网私有部署；公开镜像务必留空。
+        VITE_BLADE_API_BASE: ${VITE_BLADE_API_BASE:-}
+        VITE_BLADE_TOKEN: ${VITE_BLADE_TOKEN:-}
+        VITE_BLADE_SOLUTION_ID: ${VITE_BLADE_SOLUTION_ID:-}
+        VITE_BLADE_BIZ_ROLE_ID: ${VITE_BLADE_BIZ_ROLE_ID:-}
     environment:
       # 连 docker 网络里的 mysql 服务名，不是 localhost
       SMART_DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-root}@mysql:3306/${MYSQL_DB:-smart}?charset=utf8mb4
@@ -60,7 +67,7 @@ services:
     ports:
       - "${HOST_APP_PORT:-8000}:8000"
     volumes:
-      - app_storage:/app/storage
+      - ${SMART_DOC_DATA_DIR:-./data}/storage:/app/storage
     depends_on:
       mysql:
         condition: service_healthy
@@ -71,7 +78,3 @@ services:
       retries: 10
       start_period: 30s
     restart: unless-stopped
-
-volumes:
-  mysql_data:
-  app_storage:
