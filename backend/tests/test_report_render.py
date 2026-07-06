@@ -1,9 +1,11 @@
 import io
+import zipfile
 import pdfplumber
 from docx import Document
 from app.reporting import model, styles
 from app.reporting.render_docx import render_docx
 from app.reporting.render_pdf import render_pdf
+from app.reporting.package import package_zip
 
 
 def test_report_model_constructs_and_holds_fields():
@@ -80,3 +82,13 @@ def test_render_pdf_is_pdf_and_contains_chinese_text():
     assert "立项审查报告" in text      # 标题（中文未乱码）
     assert "必须有预算表" in text      # 发现名称
     assert "机审初判" in text          # 审计留痕
+
+
+def test_package_zip_contains_all_files():
+    data = package_zip({"a.docx": b"AAA", "b.pdf": b"%PDF-BB"})
+    assert isinstance(data, bytes)
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        names = set(z.namelist())
+        assert names == {"a.docx", "b.pdf"}
+        assert z.read("a.docx") == b"AAA"
+        assert z.read("b.pdf") == b"%PDF-BB"
