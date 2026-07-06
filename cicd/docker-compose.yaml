@@ -1,0 +1,77 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  smart-doc-review 镜像部署 compose                                          ║
+# ║  配合 cicd/Dockerfile 构建的单镜像（前端静态 + FastAPI 后端一体）。          ║
+# ║                                                                            ║
+# ║  用法（仓库根目录）：                                                        ║
+# ║    docker compose -f cicd/docker-compose.yaml up -d                        ║
+# ║  默认拉取 GHCR 流水线产物（.github/workflows/app-image-develop.yml，        ║
+# ║  推 dev-* tag 或手动触发产出）；本地构建：                                   ║
+# ║    docker compose -f cicd/docker-compose.yaml build                        ║
+# ║                                                                            ║
+# ║  与根目录 docker-compose.yml 的区别：根目录那份是本地开发全家桶              ║
+# ║  （含 blade-agent / skill-registry），这份只部署本应用镜像 + MySQL。         ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+services:
+  # ───────── 数据库（库 smart，数据目录为空时首启自动导入 schema 建表）─────────
+  mysql:
+    container_name: smart-doc-mysql
+    image: mysql:8.0
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DB:-smart}
+    ports:
+      - "${HOST_MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # 路径相对本 compose 文件；表结构由该 SQL 建立（应用不做 create_all）
+      - ../docs/file/审查系统-schema_mysql.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+    restart: unless-stopped
+
+  # ───────── 应用（前端 + 后端单镜像，8000 端口同时出页面和 /api）─────────
+  smart-doc-review:
+    container_name: smart-doc-review
+    image: ghcr.io/blade-hq/smart-doc-review:${SMART_DOC_IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: cicd/Dockerfile
+    environment:
+      # 连 docker 网络里的 mysql 服务名，不是 localhost
+      SMART_DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-root}@mysql:3306/${MYSQL_DB:-smart}?charset=utf8mb4
+      # 写端点鉴权 key（为空则不鉴权，对外可达部署务必设置）
+      SMART_API_KEY: ${SMART_API_KEY:-}
+      # 同源部署无需跨域，保留本地前端 dev 调试来源
+      SMART_CORS_ORIGINS: ${SMART_CORS_ORIGINS:-http://localhost:3200}
+      # 登录 token 签名密钥，生产必须覆盖默认值
+      SMART_AUTH_SECRET: ${SMART_AUTH_SECRET:-smart-doc-dev-secret-change-me}
+      # 启动时幂等应用增量迁移（password_hash 列 / review_task 等表）
+      SMART_AUTO_MIGRATE: ${SMART_AUTO_MIGRATE:-true}
+      # 种入初始账号（admin/admin123、reviewer1/review123…）；生产环境建议改为 false
+      SMART_SEED_USERS: ${SMART_SEED_USERS:-true}
+    ports:
+      - "${HOST_APP_PORT:-8000}:8000"
+    volumes:
+      - app_storage:/app/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  app_storage:

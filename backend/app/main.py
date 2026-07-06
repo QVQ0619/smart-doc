@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session
 
 from .config import settings
@@ -39,6 +41,11 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     def health():
         return {"status": "ok"}
+
+    # 单镜像部署形态：托管前端构建产物。必须在所有 /api 路由之后 mount，
+    # 否则 "/" 挂载会吞掉 API 请求。
+    if settings.frontend_dist_dir and Path(settings.frontend_dist_dir).is_dir():
+        app.mount("/", StaticFiles(directory=settings.frontend_dist_dir, html=True), name="frontend")
 
     return app
 
